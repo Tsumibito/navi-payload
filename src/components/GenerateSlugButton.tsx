@@ -38,21 +38,23 @@ export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
       appliedStyles.push({ element, property, previous });
     };
 
-    // Контейнер с input и кнопкой в одну линию
-    setStyle(container, 'display', 'flex');
-    setStyle(container, 'align-items', 'center');
-    setStyle(container, 'gap', '0.5rem');
+    // Контейнер должен быть relative для абсолютного позиционирования кнопки
+    setStyle(container, 'position', 'relative');
 
     const input = container.querySelector('input');
     if (input instanceof HTMLInputElement) {
-      setStyle(input, 'flex', '1');
-      setStyle(input, 'min-width', '0');
+      // Добавляем padding справа для кнопки
+      setStyle(input, 'padding-right', '3.5rem');
     }
 
-    // Кнопка справа от input
+    // Кнопка абсолютно позиционирована справа внутри поля
+    wrapper.style.position = 'absolute';
+    wrapper.style.right = '0.5rem';
+    wrapper.style.top = '50%';
+    wrapper.style.transform = 'translateY(-50%)';
     wrapper.style.display = 'inline-flex';
     wrapper.style.alignItems = 'center';
-    wrapper.style.flexShrink = '0';
+    wrapper.style.zIndex = '1';
 
     // Описание под полем
     const fieldWrapper = container.parentElement;

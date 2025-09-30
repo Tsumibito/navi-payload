@@ -40,20 +40,20 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
     const container = button.parentElement;
     if (!container) return;
 
-    // Контейнер с textarea и кнопкой в одну линию
-    container.style.display = 'flex';
-    container.style.alignItems = 'flex-start';
-    container.style.gap = '0.5rem';
+    // Контейнер должен быть relative для абсолютного позиционирования кнопки
+    container.style.position = 'relative';
 
     const textarea = container.querySelector('textarea');
     if (textarea instanceof HTMLTextAreaElement) {
-      textarea.style.flex = '1';
-      textarea.style.minWidth = '0';
+      // Добавляем padding справа для кнопки
+      textarea.style.paddingRight = '3.5rem';
     }
 
-    // Кнопка справа от textarea
-    button.style.flexShrink = '0';
-    button.style.marginTop = '0';
+    // Кнопка абсолютно позиционирована справа вверху внутри поля
+    button.style.position = 'absolute';
+    button.style.right = '0.5rem';
+    button.style.top = '0.5rem';
+    button.style.zIndex = '1';
 
     // Описание под полем
     const fieldWrapper = container.parentElement;
@@ -156,7 +156,6 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
           cursor: isGenerating ? 'not-allowed' : 'pointer',
           boxShadow: isGenerating ? 'none' : '0 0 0 1px rgba(37, 99, 235, 0.25)',
           transition: 'background-color 0.2s ease, transform 0.1s ease',
-          marginLeft: '0.5rem',
         }}
         onMouseDown={(event) => {
           if (isGenerating) return;
