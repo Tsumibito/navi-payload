@@ -40,21 +40,24 @@ export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
 
     // Контейнер должен быть relative для абсолютного позиционирования кнопки
     setStyle(container, 'position', 'relative');
+    setStyle(container, 'display', 'block');
 
     const input = container.querySelector('input');
     if (input instanceof HTMLInputElement) {
       // Добавляем padding справа для кнопки
-      setStyle(input, 'padding-right', '2.75rem');
+      setStyle(input, 'padding-right', '2.5rem');
+      setStyle(input, 'width', '100%');
     }
 
     // Кнопка абсолютно позиционирована справа внутри поля
     wrapper.style.position = 'absolute';
-    wrapper.style.right = '0.25rem';
+    wrapper.style.right = '0.375rem';
     wrapper.style.top = '50%';
     wrapper.style.transform = 'translateY(-50%)';
     wrapper.style.display = 'inline-flex';
     wrapper.style.alignItems = 'center';
-    wrapper.style.zIndex = '1';
+    wrapper.style.zIndex = '10';
+    wrapper.style.pointerEvents = 'auto';
 
     // Описание под полем
     const fieldWrapper = container.parentElement;
@@ -97,8 +100,8 @@ export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
         aria-label="Сгенерировать slug"
         title="Сгенерировать slug"
         style={{
-          height: '2rem',
-          width: '2rem',
+          height: '1.75rem',
+          width: '1.75rem',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -107,8 +110,8 @@ export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
           backgroundColor: !source?.value ? '#93c5fd' : '#2563eb',
           color: '#ffffff',
           cursor: !source?.value ? 'not-allowed' : 'pointer',
-          boxShadow: !source?.value ? 'none' : '0 0 0 1px rgba(37, 99, 235, 0.25)',
-          transition: 'background-color 0.2s ease, transform 0.1s ease',
+          boxShadow: !source?.value ? 'none' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+          transition: 'all 0.2s ease',
         }}
         onMouseDown={(e) => {
           if (!source?.value) return;

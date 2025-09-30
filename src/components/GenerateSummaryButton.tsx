@@ -42,18 +42,21 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
 
     // Контейнер должен быть relative для абсолютного позиционирования кнопки
     container.style.position = 'relative';
+    container.style.display = 'block';
 
     const textarea = container.querySelector('textarea');
     if (textarea instanceof HTMLTextAreaElement) {
       // Добавляем padding справа для кнопки
-      textarea.style.paddingRight = '2.75rem';
+      textarea.style.paddingRight = '2.5rem';
+      textarea.style.width = '100%';
     }
 
     // Кнопка абсолютно позиционирована справа вверху внутри поля
     button.style.position = 'absolute';
-    button.style.right = '0.25rem';
-    button.style.top = '0.25rem';
-    button.style.zIndex = '1';
+    button.style.right = '0.375rem';
+    button.style.top = '0.375rem';
+    button.style.zIndex = '10';
+    button.style.pointerEvents = 'auto';
 
     // Описание под полем
     const fieldWrapper = container.parentElement;
@@ -140,8 +143,8 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
         aria-label={isGenerating ? 'Генерация описания' : 'Сгенерировать описание'}
         title={isGenerating ? 'Генерация описания' : 'Сгенерировать описание'}
         style={{
-          height: '2rem',
-          width: '2rem',
+          height: '1.75rem',
+          width: '1.75rem',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -150,8 +153,8 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
           backgroundColor: isGenerating ? '#9ca3af' : '#2563eb',
           color: '#ffffff',
           cursor: isGenerating ? 'not-allowed' : 'pointer',
-          boxShadow: isGenerating ? 'none' : '0 0 0 1px rgba(37, 99, 235, 0.25)',
-          transition: 'background-color 0.2s ease, transform 0.1s ease',
+          boxShadow: isGenerating ? 'none' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+          transition: 'all 0.2s ease',
         }}
         onMouseDown={(event) => {
           if (isGenerating) return;
