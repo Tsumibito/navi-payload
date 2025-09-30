@@ -48,15 +48,15 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
     if (textarea instanceof HTMLTextAreaElement) {
       // Добавляем padding справа для кнопки
       textarea.style.paddingRight = '2.5rem';
-      textarea.style.width = '100%';
     }
 
     // Кнопка абсолютно позиционирована справа вверху внутри поля
     button.style.position = 'absolute';
-    button.style.right = '0.375rem';
-    button.style.top = '0.375rem';
+    button.style.right = '0.25rem';
+    button.style.top = '0.25rem';
+    button.style.width = '2rem';
+    button.style.height = '2rem';
     button.style.zIndex = '10';
-    button.style.pointerEvents = 'auto';
 
     // Описание под полем
     const fieldWrapper = container.parentElement;
