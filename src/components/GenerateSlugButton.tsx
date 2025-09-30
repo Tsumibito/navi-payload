@@ -51,11 +51,12 @@ export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
 
     // Кнопка абсолютно позиционирована справа внутри поля
     wrapper.style.position = 'absolute';
-    wrapper.style.right = '0.375rem';
-    wrapper.style.top = '50%';
-    wrapper.style.transform = 'translateY(-50%)';
+    wrapper.style.right = '0.5rem';
+    wrapper.style.top = '0.375rem';
+    wrapper.style.bottom = '0.375rem';
     wrapper.style.display = 'inline-flex';
     wrapper.style.alignItems = 'center';
+    wrapper.style.justifyContent = 'center';
     wrapper.style.zIndex = '10';
     wrapper.style.pointerEvents = 'auto';
 
@@ -100,8 +101,8 @@ export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
         aria-label="Сгенерировать slug"
         title="Сгенерировать slug"
         style={{
-          height: '1.75rem',
-          width: '1.75rem',
+          height: '2rem',
+          width: '2rem',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -124,7 +125,7 @@ export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
           e.currentTarget.style.transform = 'scale(1)';
         }}
       >
-        <span style={{ fontSize: '0.9rem', lineHeight: 1 }}>✨</span>
+        <span style={{ fontSize: '1rem', lineHeight: 1 }}>✨</span>
       </button>
     </span>
   );

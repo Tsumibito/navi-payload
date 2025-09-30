@@ -143,8 +143,8 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
         aria-label={isGenerating ? 'Генерация описания' : 'Сгенерировать описание'}
         title={isGenerating ? 'Генерация описания' : 'Сгенерировать описание'}
         style={{
-          height: '1.75rem',
-          width: '1.75rem',
+          height: '2rem',
+          width: '2rem',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -167,7 +167,7 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
           event.currentTarget.style.transform = 'scale(1)';
         }}
       >
-        <span style={{ fontSize: '0.9rem', lineHeight: 1 }}>{isGenerating ? '…' : '✨'}</span>
+        <span style={{ fontSize: '1rem', lineHeight: 1 }}>{isGenerating ? '…' : '✨'}</span>
       </button>
       {error && (
         <span
