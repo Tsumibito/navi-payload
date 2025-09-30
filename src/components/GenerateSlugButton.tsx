@@ -44,12 +44,12 @@ export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
     const input = container.querySelector('input');
     if (input instanceof HTMLInputElement) {
       // Добавляем padding справа для кнопки
-      setStyle(input, 'padding-right', '3.5rem');
+      setStyle(input, 'padding-right', '2.75rem');
     }
 
     // Кнопка абсолютно позиционирована справа внутри поля
     wrapper.style.position = 'absolute';
-    wrapper.style.right = '0.5rem';
+    wrapper.style.right = '0.25rem';
     wrapper.style.top = '50%';
     wrapper.style.transform = 'translateY(-50%)';
     wrapper.style.display = 'inline-flex';
@@ -88,8 +88,6 @@ export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
     });
   };
 
-  const size = 'var(--field-input-height, 2.75rem)';
-
   return (
     <span ref={wrapperRef}>
       <button
@@ -99,15 +97,13 @@ export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
         aria-label="Сгенерировать slug"
         title="Сгенерировать slug"
         style={{
-          height: size,
-          width: size,
-          minHeight: '2.5rem',
-          minWidth: '2.5rem',
+          height: '2rem',
+          width: '2rem',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
           border: 'none',
-          borderRadius: '0.5rem',
+          borderRadius: '0.25rem',
           backgroundColor: !source?.value ? '#93c5fd' : '#2563eb',
           color: '#ffffff',
           cursor: !source?.value ? 'not-allowed' : 'pointer',
@@ -125,7 +121,7 @@ export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
           e.currentTarget.style.transform = 'scale(1)';
         }}
       >
-        <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>✨</span>
+        <span style={{ fontSize: '0.9rem', lineHeight: 1 }}>✨</span>
       </button>
     </span>
   );

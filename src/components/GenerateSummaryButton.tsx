@@ -46,13 +46,13 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
     const textarea = container.querySelector('textarea');
     if (textarea instanceof HTMLTextAreaElement) {
       // Добавляем padding справа для кнопки
-      textarea.style.paddingRight = '3.5rem';
+      textarea.style.paddingRight = '2.75rem';
     }
 
     // Кнопка абсолютно позиционирована справа вверху внутри поля
     button.style.position = 'absolute';
-    button.style.right = '0.5rem';
-    button.style.top = '0.5rem';
+    button.style.right = '0.25rem';
+    button.style.top = '0.25rem';
     button.style.zIndex = '1';
 
     // Описание под полем
@@ -130,8 +130,6 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
     }
   };
 
-  const size = 'var(--field-input-height, 2.75rem)';
-
   return (
     <>
       <button
@@ -142,15 +140,13 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
         aria-label={isGenerating ? 'Генерация описания' : 'Сгенерировать описание'}
         title={isGenerating ? 'Генерация описания' : 'Сгенерировать описание'}
         style={{
-          height: size,
-          width: size,
-          minHeight: '2.5rem',
-          minWidth: '2.5rem',
+          height: '2rem',
+          width: '2rem',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
           border: 'none',
-          borderRadius: '0.5rem',
+          borderRadius: '0.25rem',
           backgroundColor: isGenerating ? '#9ca3af' : '#2563eb',
           color: '#ffffff',
           cursor: isGenerating ? 'not-allowed' : 'pointer',
@@ -168,7 +164,7 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
           event.currentTarget.style.transform = 'scale(1)';
         }}
       >
-        <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>{isGenerating ? '…' : '✨'}</span>
+        <span style={{ fontSize: '0.9rem', lineHeight: 1 }}>{isGenerating ? '…' : '✨'}</span>
       </button>
       {error && (
         <span
