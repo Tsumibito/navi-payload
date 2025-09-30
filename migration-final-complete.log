@@ -1,0 +1,109 @@
+
+> navi-payload@0.1.0 migrate:sanity
+> NODE_OPTIONS=--no-experimental-fetch tsx scripts/migrate-sanity-to-payload.ts
+
+Sanity → Payload migration started. Options: dryRun=false, skipMedia=false
+[⣷] Pulling schema from database...
+[2K[1G[⣯] Pulling schema from database...
+[2K[1G[⣟] Pulling schema from database...
+[2K[1G[✓] Pulling schema from database...
+[13:32:00] [33mWARN[39m: [36mNo email adapter provided. Email will be written to console. More info at https://payloadcms.com/docs/email/overview.[39m
+Fetched from Sanity: certificates=7, trainings=0, tags=55, faqs=0, team=3, posts=44, redirects=270, globals=1
+Skipping translation without supported language (tr-team-b9264b73-e3fa-41f8-98e9-43f93ca38342-0)
+Skipping translation without supported language (tr-team-b9264b73-e3fa-41f8-98e9-43f93ca38342-1)
+Skipping translation without supported language (tr-team-da06863f-4444-4ca1-a3e6-c6c7031bc1c3-0)
+Skipping translation without supported language (tr-team-da06863f-4444-4ca1-a3e6-c6c7031bc1c3-1)
+Skipping translation without supported language (tr-team-dab017a0-32d5-4293-b4d7-12ae22441bd8-0)
+Skipping translation without supported language (tr-team-dab017a0-32d5-4293-b4d7-12ae22441bd8-1)
+Post kapitan-ili-shkiper-v-chem-otlichie-raskryvaem-sekrety-yahtennoy-sertifikatsii: author=1, tags=10, faqs=0
+Post 7-luchshih-podarkov-dlya-yahtsmena-v-2025-godu: author=1, tags=12, faqs=0
+Post chto-takoe-katabaticheskiy-veter-i-chem-on-opasen-dlya-yahtsmenov: author=1, tags=13, faqs=0
+Post pochemu-razmery-yahty-izmeryayut-v-futah-kak-perevesti-fut-v-sm-futy-v-metry-ili-naoborot-metry-v-futy: author=1, tags=9, faqs=0
+Post kursy-otnositel-no-vetra-v-yahtinge-rukovodstvo-dlya-nachinayuschih: author=1, tags=7, faqs=0
+Post vidy-kiley-parusnoy-yahty-kak-razobratsya: author=1, tags=10, faqs=0
+Post sayty-prognoza-pogody-vash-gid-po-samym-tochnym-meteo-saytam-dlya-morya-i-yahtinga: author=1, tags=12, faqs=0
+Post layfhaki-po-organizatsii-prostranstva-na-bortu-yahty-sovety-opytnyh-puteshestvenniko: author=1, tags=6, faqs=0
+Post kak-rabotaet-gps-i-rol-elektronnoy-navigatsii-v-mire-yahtinga: author=1, tags=11, faqs=0
+Post shvartovka-dlya-nachinayuschih-poshagovoe-rukovodstvo: author=1, tags=11, faqs=0
+Post yahting-s-det-mi-kak-podgotovit-sya-k-semeynomu-otpusku-na-yahte: author=1, tags=12, faqs=0
+Post rabota-s-verevkami-na-yahte-lebedki-i-bloki-dlya-chaynikov: author=1, tags=13, faqs=0
+Post katamaran-ili-odnokorpusnaya-yahta-chto-vybrat-dlya-vashego-sleduyuschego-puteshestviya: author=1, tags=14, faqs=0
+Post kak-izbezhat-morskoy-bolezni-gayd-dlya-novichkov-v-yahtinge: author=1, tags=10, faqs=0
+Post vidy-yakorey-na-sovremennoy-parusnoy-yahte: author=1, tags=10, faqs=0
+Post shvartovka-lagom-eto-prosto: author=1, tags=15, faqs=0
+Post chto-takoe-yahting: author=3, tags=11, faqs=0
+Post gps-ais-i-radar-tri-glaza-vashey-yakhty-znaete-li-vy-raznitsu: author=1, tags=0, faqs=0
+Post kakie-yahtennye-prava-vam-nuzhny-vidy-shkiperskih-sertifikatov: author=1, tags=12, faqs=0
+Post morskie-sueveriya-ot-neptuna-do-zapreta-na-banany-na-bortu: author=1, tags=12, faqs=0
+Post kakie-yahtennye-prava-nuzhny-dlya-chartera: author=1, tags=13, faqs=0
+Post yahtennyy-etiket-pravila-horoshego-tona-dlya-gostey-i-ekipazha: author=1, tags=12, faqs=0
+Post morskaya-bolezn: author=1, tags=10, faqs=0
+Post vidy-parusnyh-yaht-raznovidnosti-i-otlichiya: author=1, tags=8, faqs=0
+Post zachem-na-yahte-dva-shturvala-podrobnyy-gid-dlya-novichkov: author=1, tags=10, faqs=0
+Post yahting-na-korsike-luchshie-marshruty-lokatsii-i-sekrety-otdyha: author=1, tags=11, faqs=0
+Post yahtennaya-marina-eto-i-chem-otlichaetsya-port-ot-mariny-dlya-yaht: author=1, tags=13, faqs=0
+Post chto-podarit-kapitanu-yahty-na-den-rozhdeniya: author=1, tags=8, faqs=0
+Post skorost-katamarana-mif-ili-realnost-dlya-kruiznyh-katamaranov: author=1, tags=12, faqs=0
+Post kompas-na-yahte-kak-polzovatsya-morskim-kompasom-i-dlya-chego-on-nuzhen-yahtsmenam: author=1, tags=14, faqs=0
+Post kak-rabotaet-parus-na-yahte-klassicheskoe-i-sovremennoe-ob-yasnenie: author=1, tags=7, faqs=0
+Post yahtennaya-terminologiya-dlya-chaynikov-77-slov-kotorye-nuzhno-znat-pered-puteshestviem-na-yahte: author=1, tags=14, faqs=0
+Post chto-podarit-yakhtsmenu-25-idey-yakhtennykh-podarok: author=1, tags=11, faqs=0
+Post postanovka-yahty-na-yakor-rukovodstvo-dlya-novichkov: author=1, tags=9, faqs=0
+Post 150-mil-bez-kilya-neozhidannoe-priklyuchenie-yahty-polbream: author=1, tags=13, faqs=0
+Post tatuirovki-moryakov-istoriya-znachenie-simvolika-i-sovremennye-tendentsii: author=1, tags=7, faqs=0
+Post tragediya-v-otkrytom-more-youtube-blogery-la-vagabonde-perezhili-ser-eznoe-stolknovenie-u-beregov-yaponii: author=1, tags=6, faqs=0
+Post istinnyy-i-vympel-nyy-veter-v-chem-razlichie-rukovodstvo-dlya-nachinayuschih-yahtsmenov: author=1, tags=8, faqs=0
+Post osnovnye-parusnye-manevry-dlya-novichkov-overshtag-i-fordevind-prostymi-slovami: author=1, tags=13, faqs=0
+Post populyarnye-vidy-shvartovok-dlya-bezopasnoy-stoyanki-parusnyh-yaht: author=1, tags=13, faqs=0
+Post vidy-yahtennyh-prav-i-shkiperskih-sertifikatov-kak-pravilno-vybrat-kurs-obucheniya: author=1, tags=15, faqs=0
+Post school-of-yachting-helmsman-leontiev-yachtsmans-library-books-on-yachting: author=1, tags=15, faqs=0
+Post den-na-yahte-podrobnyy-gayd-dlya-novichkov: author=1, tags=14, faqs=0
+Post yahting-i-pogoda-chto-nuzhno-znat-nachinayuschim: author=1, tags=10, faqs=0
+Failed to ingest redirect null: The following fields are invalid: From Path, To Path
+Failed to ingest redirect null: The following fields are invalid: From Path, To Path
+Failed to ingest redirect null: The following fields are invalid: From Path, To Path
+Failed to ingest redirect null: The following fields are invalid: From Path, To Path
+Failed to ingest redirect null: The following fields are invalid: From Path, To Path
+Failed to ingest redirect null: The following fields are invalid: From Path, To Path
+\n=== Sanity to Payload ID mapping ===
+Total mappings: 109
+Team: team-b9264b73-e3fa-41f8-98e9-43f93ca38342 → 1
+Team: team-da06863f-4444-4ca1-a3e6-c6c7031bc1c3 → 2
+Team: team-dab017a0-32d5-4293-b4d7-12ae22441bd8 → 3
+Resolving pending relations...
+Pending relations resolved.
+Migration summary:
+{
+  "certificates": {
+    "created": 7,
+    "updated": 0
+  },
+  "trainings": {
+    "created": 0,
+    "updated": 0
+  },
+  "tags": {
+    "created": 55,
+    "updated": 0
+  },
+  "faqs": {
+    "created": 0,
+    "updated": 0
+  },
+  "team": {
+    "created": 3,
+    "updated": 0
+  },
+  "posts": {
+    "created": 44,
+    "updated": 0
+  },
+  "globals": {
+    "updated": 1
+  },
+  "redirects": {
+    "created": 264,
+    "updated": 0
+  }
+}
+Sanity → Payload migration finished.

@@ -1,0 +1,252 @@
+import type { CollectionConfig, CollectionSlug } from 'payload';
+import { lexicalEditor } from '@payloadcms/richtext-lexical';
+
+import { createSeoField } from '../fields/seo';
+import { translationFields } from '../fields/translation';
+import { contentEditorFeatures } from '../utils/lexicalConfig';
+
+const POSTS_RELATION = 'posts' as unknown as CollectionSlug;
+const FAQS_RELATION = 'faqs' as unknown as CollectionSlug;
+
+const dedupeRelationField = <T>(items: T[]): T[] => {
+  const seen = new Set<string>();
+  const result: T[] = [];
+
+  for (const item of items) {
+    if (item === null || item === undefined) {
+      continue;
+    }
+
+    let key: string;
+
+    if (typeof item === 'object') {
+      const maybeRelation = item as { relationTo?: string; value?: unknown; id?: unknown };
+      const identifier = maybeRelation.value ?? maybeRelation.id ?? JSON.stringify(item);
+      key = `${maybeRelation.relationTo ?? ''}:${String(identifier)}`;
+    } else {
+      key = String(item);
+    }
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push(item);
+  }
+
+  return result;
+};
+
+export const Tags: CollectionConfig = {
+  slug: 'tags',
+  labels: {
+    singular: 'Tag',
+    plural: 'Tags',
+  },
+  admin: {
+    useAsTitle: 'name',
+    defaultColumns: ['name', 'slug'],
+  },
+  versions: {
+    drafts: {
+      autosave: {
+        interval: 2000,
+      },
+    },
+  },
+  hooks: {
+    beforeChange: [
+      ({ data, operation }) => {
+        if (!data) {
+          return data;
+        }
+
+        let changed = false;
+        let nextData = data;
+
+        if (operation === 'create' && (!data._status || data._status === 'draft')) {
+          nextData = {
+            ...nextData,
+            _status: 'published',
+          };
+          changed = true;
+        }
+
+        if (Array.isArray(data.posts)) {
+          const dedupedPosts = dedupeRelationField(data.posts);
+          if (dedupedPosts.length !== data.posts.length) {
+            nextData = {
+              ...nextData,
+              posts: dedupedPosts,
+            };
+            changed = true;
+          }
+        }
+
+        if (Array.isArray(data.faqs)) {
+          const dedupedFaqs = dedupeRelationField(data.faqs);
+          if (dedupedFaqs.length !== data.faqs.length) {
+            nextData = {
+              ...nextData,
+              faqs: dedupedFaqs,
+            };
+            changed = true;
+          }
+        }
+
+        return changed ? nextData : data;
+      },
+    ],
+  },
+  fields: [
+    {
+      type: 'tabs',
+      tabs: [
+        {
+          label: 'Content',
+          fields: [
+            {
+              type: 'text',
+              name: 'name',
+              label: 'Title',
+              required: true,
+              admin: {
+                description: 'Tag display name',
+              },
+            },
+            {
+              type: 'text',
+              name: 'slug',
+              label: 'Slug',
+              required: true,
+              unique: true,
+              admin: {
+                description: 'Tag URL slug',
+                components: {
+                  afterInput: ['/src/components/GenerateSlugButton#GenerateSlugButton'],
+                },
+              },
+            },
+            {
+              type: 'upload',
+              name: 'image',
+              label: 'Featured image',
+              relationTo: 'media',
+            },
+            {
+              type: 'textarea',
+              name: 'summary',
+              label: 'Summary',
+              admin: {
+                description: '1–2 sentence overview',
+                components: {
+                  afterInput: ['/src/components/GenerateSummaryButton#GenerateSummaryButton'],
+                },
+              },
+            },
+            {
+              type: 'textarea',
+              name: 'descriptionForAI',
+              label: 'AI context',
+              admin: {
+                description: 'Optional hints for AI assistants',
+              },
+            },
+            {
+              type: 'richText',
+              name: 'content',
+              label: 'Content',
+              editor: lexicalEditor({
+                features: contentEditorFeatures,
+              }),
+              admin: {
+                description: 'Main copy for the tag page',
+                style: {
+                  maxWidth: '800px',
+                },
+              },
+            },
+            {
+              type: 'relationship',
+              name: 'posts',
+              label: 'Posts',
+              relationTo: [POSTS_RELATION],
+              hasMany: true,
+              admin: {
+                description: 'Attach relevant posts',
+              },
+            },
+            {
+              type: 'relationship',
+              name: 'faqs',
+              label: 'FAQ entries',
+              relationTo: [FAQS_RELATION],
+              hasMany: true,
+            },
+            {
+              type: 'collapsible',
+              label: 'Social images',
+              admin: {
+                initCollapsed: true,
+              },
+              fields: [
+                {
+                  type: 'group',
+                  name: 'socialImages',
+                  label: 'Images',
+                  admin: {
+                    description: 'Optional artwork for different aspect ratios',
+                  },
+                  fields: [
+                    {
+                      type: 'upload',
+                      name: 'thumbnail',
+                      label: 'Thumbnail',
+                      relationTo: 'media',
+                    },
+                    {
+                      type: 'upload',
+                      name: 'image16x9',
+                      label: 'Image 16:9',
+                      relationTo: 'media',
+                    },
+                    {
+                      type: 'upload',
+                      name: 'image5x4',
+                      label: 'Image 5:4',
+                      relationTo: 'media',
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          label: 'SEO',
+          fields: [createSeoField()],
+        },
+        {
+          label: 'Translations',
+          fields: [
+            {
+              type: 'array',
+              name: 'translations',
+              label: 'Translations',
+              admin: {
+                description: 'Localized versions of the tag',
+                initCollapsed: true,
+              },
+              fields: translationFields({
+                includeSummaryGenerator: true,
+                includeSlugGenerator: true,
+                summaryGeneratorComponent: '/src/components/GenerateTagSummaryButton#GenerateTagSummaryButton',
+              }),
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};

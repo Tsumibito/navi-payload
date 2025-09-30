@@ -1,0 +1,84 @@
+Starting migration data patch...
+[⣷] Pulling schema from database...
+[2K[1G[⣯] Pulling schema from database...
+[2K[1G[⣟] Pulling schema from database...
+[2K[1G[⡿] Pulling schema from database...
+[2K[1G[✓] Pulling schema from database...
+[13:54:58] [33mWARN[39m: [36mNo email adapter provided. Email will be written to console. More info at https://payloadcms.com/docs/email/overview.[39m
+
+=== Patching Team bioSummary ===
+Team bioSummary patched: 0 members
+
+=== Patching Team links ===
+Team member Евгения Пильгун has invalid links structure
+Team member Андрей Говорской has invalid links structure
+Team member Алексей Бурлаков has invalid links structure
+Team links checked
+
+=== Patching Certificates description ===
+Fixed description for certificate: Inshore Skipper Sail
+Fixed description for certificate: Offshore Skipper Sail
+Fixed description for certificate: Offshore Skipper Power
+Fixed description for certificate: Master of Yacht
+Fixed description for certificate: Inshore Skipper Power
+Fixed description for certificate: Yacht Crew
+Fixed description for certificate: VHF SRC
+Certificates description patched: 7 certificates
+
+=== Patching Tags posts relations ===
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Failed to update tag [object Object]: Missing 'where' query of documents to update.
+Tags posts relations patched: 0 tags updated
+
+✅ Migration data patch completed!

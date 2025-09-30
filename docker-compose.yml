@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  payload-postgres:
+    image: postgres:16-alpine
+    container_name: payload-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: payload
+      POSTGRES_USER: payload
+      POSTGRES_PASSWORD: payload
+    ports:
+      - "5433:5432"
+    volumes:
+      - payload-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  payload-postgres-data:

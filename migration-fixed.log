@@ -1,0 +1,60 @@
+
+> navi-payload@0.1.0 migrate:sanity
+> NODE_OPTIONS=--no-experimental-fetch tsx scripts/migrate-sanity-to-payload.ts
+
+Sanity → Payload migration started. Options: dryRun=false, skipMedia=false
+[⣷] Pulling schema from database...
+[2K[1G[⣯] Pulling schema from database...
+[2K[1G[⣟] Pulling schema from database...
+[2K[1G[✓] Pulling schema from database...
+[12:53:49] [33mWARN[39m: [36mNo email adapter provided. Email will be written to console. More info at https://payloadcms.com/docs/email/overview.[39m
+Fetched from Sanity: certificates=7, trainings=0, tags=55, faqs=0, team=3, posts=44, redirects=270, globals=1
+Skipping translation without supported language (tr-team-b9264b73-e3fa-41f8-98e9-43f93ca38342-0)
+Skipping translation without supported language (tr-team-b9264b73-e3fa-41f8-98e9-43f93ca38342-1)
+Skipping translation without supported language (tr-team-da06863f-4444-4ca1-a3e6-c6c7031bc1c3-0)
+Skipping translation without supported language (tr-team-da06863f-4444-4ca1-a3e6-c6c7031bc1c3-1)
+Skipping translation without supported language (tr-team-dab017a0-32d5-4293-b4d7-12ae22441bd8-0)
+Skipping translation without supported language (tr-team-dab017a0-32d5-4293-b4d7-12ae22441bd8-1)
+Failed to ingest redirect null: The following fields are invalid: From Path, To Path
+Failed to ingest redirect null: The following fields are invalid: From Path, To Path
+Failed to ingest redirect null: The following fields are invalid: From Path, To Path
+Failed to ingest redirect null: The following fields are invalid: From Path, To Path
+Failed to ingest redirect null: The following fields are invalid: From Path, To Path
+Failed to ingest redirect null: The following fields are invalid: From Path, To Path
+Resolving pending relations...
+Pending relations resolved.
+Migration summary:
+{
+  "certificates": {
+    "created": 7,
+    "updated": 0
+  },
+  "trainings": {
+    "created": 0,
+    "updated": 0
+  },
+  "tags": {
+    "created": 55,
+    "updated": 0
+  },
+  "faqs": {
+    "created": 0,
+    "updated": 0
+  },
+  "team": {
+    "created": 3,
+    "updated": 0
+  },
+  "posts": {
+    "created": 44,
+    "updated": 0
+  },
+  "globals": {
+    "updated": 1
+  },
+  "redirects": {
+    "created": 264,
+    "updated": 0
+  }
+}
+Sanity → Payload migration finished.

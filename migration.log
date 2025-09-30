@@ -1,0 +1,35 @@
+
+> navi-payload@0.1.0 migrate:sanity
+> NODE_OPTIONS=--no-experimental-fetch tsx scripts/migrate-sanity-to-payload.ts
+
+Sanity → Payload migration started. Options: dryRun=false, skipMedia=false
+[⣷] Pulling schema from database...
+[2K[1G[⣯] Pulling schema from database...
+[2K[1G[⣟] Pulling schema from database...
+[2K[1G[✓] Pulling schema from database...
+[12:29:18] [33mWARN[39m: [36mNo email adapter provided. Email will be written to console. More info at https://payloadcms.com/docs/email/overview.[39m
+Fetched from Sanity: certificates=7, trainings=0, tags=55, faqs=0, team=3, posts=44, redirects=270, globals=1
+Migration failed: ValidationError: The following fields are invalid: Translations 1 > Content, Translations 2 > Content, Content
+    at beforeChange (/Users/al1/Navi/CascadeProjects/windsurf-project/navi-payload/node_modules/payload/dist/fields/hooks/beforeChange/index.js:40:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async updateDocument (/Users/al1/Navi/CascadeProjects/windsurf-project/navi-payload/node_modules/payload/dist/collections/operations/utilities/update.js:171:18)
+    at async updateByIDOperation (/Users/al1/Navi/CascadeProjects/windsurf-project/navi-payload/node_modules/payload/dist/collections/operations/updateByID.js:113:22)
+    at async upsertByField (/Users/al1/Navi/CascadeProjects/windsurf-project/navi-payload/scripts/migrate-sanity-to-payload.ts:579:21)
+    at async ingestTags (/Users/al1/Navi/CascadeProjects/windsurf-project/navi-payload/scripts/migrate-sanity-to-payload.ts:705:20)
+    at async main (/Users/al1/Navi/CascadeProjects/windsurf-project/navi-payload/scripts/migrate-sanity-to-payload.ts:1102:11) {
+  data: {
+    id: 1,
+    collection: 'tags',
+    errors: [ [Object], [Object], [Object] ],
+    global: undefined
+  },
+  isOperational: true,
+  isPublic: false,
+  status: 400,
+  [cause]: {
+    id: 1,
+    collection: 'tags',
+    errors: [ [Object], [Object], [Object] ],
+    global: undefined
+  }
+}

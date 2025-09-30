@@ -1,0 +1,32 @@
+
+> navi-payload@0.1.0 migrate:sanity
+> NODE_OPTIONS=--no-experimental-fetch tsx scripts/migrate-sanity-to-payload.ts
+
+Sanity → Payload migration started. Options: dryRun=false, skipMedia=false
+[⣷] Pulling schema from database...
+[2K[1G[⣯] Pulling schema from database...
+[2K[1G[⣟] Pulling schema from database...
+[2K[1G[⡿] Pulling schema from database...
+[2K[1G[⢿] Pulling schema from database...
+[2K[1G[✓] Pulling schema from database...
+[12:30:21] [33mWARN[39m: [36mNo email adapter provided. Email will be written to console. More info at https://payloadcms.com/docs/email/overview.[39m
+Fetched from Sanity: certificates=7, trainings=0, tags=55, faqs=0, team=3, posts=44, redirects=270, globals=1
+Skipping translation without supported language (tr-team-b9264b73-e3fa-41f8-98e9-43f93ca38342-0)
+Skipping translation without supported language (tr-team-b9264b73-e3fa-41f8-98e9-43f93ca38342-1)
+Skipping translation without supported language (tr-team-da06863f-4444-4ca1-a3e6-c6c7031bc1c3-0)
+Skipping translation without supported language (tr-team-da06863f-4444-4ca1-a3e6-c6c7031bc1c3-1)
+Skipping translation without supported language (tr-team-dab017a0-32d5-4293-b4d7-12ae22441bd8-0)
+Skipping translation without supported language (tr-team-dab017a0-32d5-4293-b4d7-12ae22441bd8-1)
+Migration failed: QueryError: The following path cannot be queried: from
+    at validateQueryPaths (/Users/al1/Navi/CascadeProjects/windsurf-project/navi-payload/node_modules/payload/dist/database/queryValidation/validateQueryPaths.js:65:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async findOperation (/Users/al1/Navi/CascadeProjects/windsurf-project/navi-payload/node_modules/payload/dist/collections/operations/find.js:125:13)
+    at async upsertByField (/Users/al1/Navi/CascadeProjects/windsurf-project/navi-payload/scripts/migrate-sanity-to-payload.ts:573:20)
+    at async ingestRedirects (/Users/al1/Navi/CascadeProjects/windsurf-project/navi-payload/scripts/migrate-sanity-to-payload.ts:892:20)
+    at async main (/Users/al1/Navi/CascadeProjects/windsurf-project/navi-payload/scripts/migrate-sanity-to-payload.ts:1118:16) {
+  data: [ { path: 'from' } ],
+  isOperational: true,
+  isPublic: false,
+  status: 400,
+  [cause]: [ { path: 'from' } ]
+}
