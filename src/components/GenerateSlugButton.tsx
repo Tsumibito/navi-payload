@@ -45,15 +45,15 @@ export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
     const input = container.querySelector('input');
     if (input instanceof HTMLInputElement) {
       // Добавляем padding справа для кнопки
-      setStyle(input, 'padding-right', '2.25rem');
+      setStyle(input, 'padding-right', '2.5rem');
     }
 
     // Кнопка абсолютно позиционирована справа внутри поля
     wrapper.style.position = 'absolute';
     wrapper.style.right = '0.25rem';
-    wrapper.style.top = '0.25rem';
-    wrapper.style.bottom = '0.25rem';
-    wrapper.style.display = 'flex';
+    wrapper.style.top = '50%';
+    wrapper.style.transform = 'translateY(-50%)';
+    wrapper.style.display = 'inline-flex';
     wrapper.style.alignItems = 'center';
     wrapper.style.justifyContent = 'center';
     wrapper.style.zIndex = '10';
@@ -99,9 +99,9 @@ export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
         aria-label="Сгенерировать slug"
         title="Сгенерировать slug"
         style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
+          width: '2rem',
+          height: '2rem',
+          display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
           border: 'none',
