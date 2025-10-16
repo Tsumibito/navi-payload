@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useLayoutEffect, useRef } from 'react';
+import React from 'react';
 import { useFormFields } from '@payloadcms/ui';
 import { generateSlug } from '../utils/slug';
 
@@ -10,76 +10,18 @@ interface GenerateSlugButtonProps {
   path?: string;
 }
 
-const DESCRIPTION_SELECTOR = '[data-element="description"], .field-description, .field__description';
-
 export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
   sourceField = 'name',
   targetField = 'slug',
   path,
 }) => {
-  const source = useFormFields(([fields]) => fields[sourceField]);
-  const { dispatchFields } = useFormFields(([, dispatch]) => ({ dispatchFields: dispatch }));
-  const wrapperRef = useRef<HTMLSpanElement>(null);
-
-  useLayoutEffect(() => {
-    const wrapper = wrapperRef.current;
-    if (!wrapper) return;
-
-    const container = wrapper.parentElement as HTMLElement | null;
-    if (!container) return;
-
-    const appliedStyles: Array<{ element: HTMLElement; property: string; previous: string }> = [];
-
-    const setStyle = (element: HTMLElement, property: string, value: string) => {
-      const previous = element.style.getPropertyValue(property);
-      if (previous === value) return;
-
-      element.style.setProperty(property, value);
-      appliedStyles.push({ element, property, previous });
-    };
-
-    // Контейнер переводим во флекс-режим, чтобы кнопка располагалась справа от поля
-    setStyle(container, 'display', 'flex');
-    setStyle(container, 'align-items', 'center');
-    setStyle(container, 'gap', '0.5rem');
-    setStyle(container, 'flex-wrap', 'wrap');
-    setStyle(container, 'width', '100%');
-
-    const input = container.querySelector('input');
-    if (input instanceof HTMLInputElement) {
-      setStyle(input, 'flex', '1 1 auto');
-      setStyle(input, 'min-width', '0');
-      setStyle(input, 'order', '1');
-    }
-
-    wrapper.style.display = 'inline-flex';
-    wrapper.style.alignItems = 'center';
-    wrapper.style.flexShrink = '0';
-    wrapper.style.order = '2';
-    wrapper.style.marginLeft = '0.25rem';
-
-    // Описание под полем
-    const fieldWrapper = container.parentElement;
-    const description = (fieldWrapper?.querySelector(DESCRIPTION_SELECTOR)) as HTMLElement | null;
-
-    if (description) {
-      setStyle(description, 'display', 'block');
-      setStyle(description, 'margin-top', '0.25rem');
-      setStyle(description, 'width', '100%');
-      setStyle(description, 'flex-basis', '100%');
-      setStyle(description, 'order', '3');
-    }
-
-    return () => {
-      for (const { element, property, previous } of appliedStyles.reverse()) {
-        if (previous) {
-          element.style.setProperty(property, previous);
-        } else {
-          element.style.removeProperty(property);
-        }
-      }
-    };
-  }, []);
+  // ВАЖНО: useFormFields вызываем ТОЛЬКО ОДИН РАЗ
+  const formData = useFormFields(([fields, dispatch]) => ({
+    source: fields[sourceField],
+    dispatchFields: dispatch,
+  }));
+  
+  const { source, dispatchFields } = formData;
 
   const handleGenerate = () => {
     if (!source?.value) return;
@@ -92,40 +34,55 @@ export const GenerateSlugButton: React.FC<GenerateSlugButtonProps> = ({
     });
   };
 
+  const handlePress = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (!source?.value) return;
+    event.currentTarget.style.transform = 'scale(0.97)';
+  };
+
+  const handleRelease = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.currentTarget.style.transform = 'scale(1)';
+  };
+
   return (
-    <span ref={wrapperRef}>
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '0.5rem',
+        marginTop: '0.4rem',
+      }}
+    >
       <button
         type="button"
         onClick={handleGenerate}
         disabled={!source?.value}
-        aria-label="Сгенерировать slug"
-        title="Сгенерировать slug"
+        aria-label="Generate Slug"
+        title="Generate Slug"
         style={{
-          width: '2rem',
-          height: '2rem',
+          padding: '0.4rem 0.85rem',
+          minHeight: '2rem',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
           border: 'none',
-          borderRadius: '0.25rem',
-          backgroundColor: !source?.value ? '#93c5fd' : '#2563eb',
-          color: '#ffffff',
+          borderRadius: '9999px',
+          backgroundColor: !source?.value ? '#e5e7eb' : '#2563eb',
+          color: !source?.value ? '#6b7280' : '#ffffff',
           cursor: !source?.value ? 'not-allowed' : 'pointer',
-          boxShadow: !source?.value ? 'none' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-          transition: 'all 0.2s ease',
+          boxShadow: !source?.value ? 'none' : '0 1px 4px rgba(37, 99, 235, 0.35)',
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+          fontSize: '0.85rem',
+          fontWeight: 600,
+          lineHeight: 1,
+          gap: '0.35rem',
         }}
-        onMouseDown={(e) => {
-          if (!source?.value) return;
-          e.currentTarget.style.transform = 'scale(0.95)';
-        }}
-        onMouseUp={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
-        }}
+        onMouseDown={handlePress}
+        onMouseUp={handleRelease}
+        onMouseLeave={handleRelease}
       >
-        <span style={{ fontSize: '1rem', lineHeight: 1 }}>✨</span>
+        <span aria-hidden="true" style={{ lineHeight: 1 }}>✨</span>
+        <span>Generate Slug</span>
       </button>
     </span>
   );

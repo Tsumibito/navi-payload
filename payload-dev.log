@@ -1,0 +1,33 @@
+
+> navi-payload@0.1.0 dev
+> NEXT_WEBPACK=1 next dev
+
+   ▲ Next.js 15.5.4
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.23:3000
+   - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 1820ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /admin/[[...segments]] in 15.4s (5942 modules)
+[15:42:08] [31mERROR[39m: [36mError: cannot connect to Postgres. Details: connect ECONNREFUSED 127.0.0.1:5433[39m
+    err: {
+      "type": "Error",
+      "message": "connect ECONNREFUSED 127.0.0.1:5433",
+      "stack":
+          Error: connect ECONNREFUSED 127.0.0.1:5433
+              at eval (webpack-internal:///(rsc)/./node_modules/.pnpm/pg-pool@3.10.1_pg@8.16.3/node_modules/pg-pool/index.js:45:11)
+              at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+              at async connectWithReconnect (webpack-internal:///(rsc)/./node_modules/.pnpm/@payloadcms+db-postgres@3.58.0_payload@3.58.0_graphql@16.11.0_typescript@5.9.3_/node_modules/@payloadcms/db-postgres/dist/connect.js:14:18)
+              at async Object.connect (webpack-internal:///(rsc)/./node_modules/.pnpm/@payloadcms+db-postgres@3.58.0_payload@3.58.0_graphql@16.11.0_typescript@5.9.3_/node_modules/@payloadcms/db-postgres/dist/connect.js:53:13)
+              at async BasePayload.init (webpack-internal:///(rsc)/./node_modules/.pnpm/payload@3.58.0_graphql@16.11.0_typescript@5.9.3/node_modules/payload/dist/index.js:781:13)
+              at async getPayload (webpack-internal:///(rsc)/./node_modules/.pnpm/payload@3.58.0_graphql@16.11.0_typescript@5.9.3/node_modules/payload/dist/index.js:988:26)
+              at async eval (webpack-internal:///(rsc)/./node_modules/.pnpm/@payloadcms+next@3.58.0_@types+react@19.2.0_graphql@16.11.0_monaco-editor@0.53.0_next@1_be3705af6b84a3e3a3b6e50527713854/node_modules/@payloadcms/next/dist/utilities/initReq.js:38:21)
+      "errno": -61,
+      "code": "ECONNREFUSED",
+      "syscall": "connect",
+      "address": "127.0.0.1",
+      "port": 5433
+    }
+[?25h

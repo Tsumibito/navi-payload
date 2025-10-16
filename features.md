@@ -82,12 +82,13 @@ npm run migrate:sanity
 ## Коллекции
 
 ### Posts
-- **Поля:** name, slug, author (relation → team), image, summary, socialImages (thumbnail, image16x9, image5x4), content (Lexical), tags (relation → tags), faqs (relation → faqs), translations, seo, featured, publishedAt
+- **Поля:** name, slug, author (relation → team), image, summary, content (Lexical), tags (relation → tags), faqs (relation → faqs), translations, seo, featured, publishedAt, socialImages (thumbnail, image16x9, image5x4)
+- **Вкладки:** Content, Technical (социальные изображения), SEO, Translations
 - **Переводы:** ru, ua, en
 - **Связи:** author → team, tags → tags[], faqs → faqs[]
 
-### Tags
-- **Поля:** name, slug, image, summary, content (Lexical), descriptionForAI, posts (relation → posts), faqs (relation → faqs), translations, seo
+- **Поля:** name, slug, image, summary, content (Lexical), descriptionForAI, posts (relation → posts), faqs (relation → faqs), translations, seo, socialImages (thumbnail, image16x9, image5x4)
+- **Вкладки:** Content, Technical (Description for AI, социальные изображения), SEO, Translations
 - **Переводы:** ru, ua, en
 - **Связи:** posts → posts[], faqs → faqs[]
 
@@ -172,6 +173,8 @@ npm run migrate:sanity
 - **Языки:** ru, ua, en (автоопределение из поля `language`)
 - **Типы:** post (2-3 предложения), tag (1-2 предложения)
 
+**UI обновление (2025-10-01):** кнопка `Generate Summary` отображается рядом с лейблом поля Summary (над самим полем), сохранена иконка ✨ и добавлен продолговатый стиль со скруглениями; ошибки выводятся рядом с кнопкой.
+
 **Как работает:**
 1. Извлекает текст из Lexical JSON контента
 2. Отправляет запрос к OpenRouter API с контекстом (заголовок + контент)
@@ -196,6 +199,8 @@ npm run migrate:sanity
 - `src/utils/slug.ts` — утилиты транслитерации
 - `src/components/GenerateSlugButton.tsx` — UI компонент
 - Используется в `Posts`, `Tags` и их переводах
+
+**UI обновление (2025-10-01):** кнопка `Generate Slug` отображается справа от лейбла (над полем) с продолговатым стилем и иконкой ✨.
 
 **Поддержка языков:**
 - **Русский:** а-я, А-Я → a-ya, A-YA
@@ -299,12 +304,193 @@ fields: [
 
 ---
 
+## Локализация (2025-10-12)
+
+### Архитектура переводов: translations array
+
+**Решение:** Используем проверенную схему с массивом `translations` вместо встроенной локализации Payload v3.
+
+**Причина:** 
+- ✅ Все данные уже мигрированы из Sanity с этой схемой
+- ✅ Работает стабильно без конфликтов БД
+- ✅ Поддерживает все необходимые языки (ru, ua, en)
+- ✅ Проще контроль версий и миграции
+- ⚠️ Требует фильтрацию по `translations.language` в API
+
+**Структура:**
+```typescript
+{
+  name: "Название на русском",
+  slug: "slug-na-russkom",
+  translations: [
+    { 
+      language: "ua", 
+      name: "Назва українською", 
+      slug: "slug-ukrainskoyu",
+      summary: "Короткий опис",
+      content: { /* Lexical JSON */ },
+      seo: { /* SEO поля */ }
+    },
+    { language: "en", name: "Name in English", slug: "slug-in-english" }
+  ]
+}
+```
+
+**Коллекции с переводами:**
+- **Posts**: 44 записи + 86 переводов
+- **Tags**: 55 записей + 110 переводов
+- **Team**: 3 записи (без переводов пока)
+- **Certificates**: 7 записей
+
+**Поля переводов** реализованы в `src/fields/translation.ts`:
+- `language` - код языка ('ru' | 'ua' | 'en')
+- `name` - название
+- `slug` - URL slug
+- `summary` - краткое описание
+- `content` - Lexical контент
+- `seo` - SEO поля (title, meta_description, focus_keyphrase, link_keywords)
+
+**Альтернатива (если понадобится):** План поэтапной миграции на встроенную локализацию находится в `LOCALIZATION-MIGRATION-PLAN.md`.
+
+---
+
+## Исправление бесконечных циклов в SEO модулях (2025-10-14)
+
+### Проблема
+SEO компоненты (`SeoKeywordManager`, `FocusKeyphraseAnalyzer`) вызывали бесконечные циклы обновлений с ошибками:
+- `Maximum update depth exceeded`
+- `Component repeatedly calls setState inside componentWillUpdate`
+
+### Причина
+**Синхронные dispatch внутри setState:**
+- Компоненты вызывали `dispatch()` (обновление формы) напрямую внутри `setState`
+- Это создавало цепную реакцию: setState → dispatch → форма обновляется → новый setState → цикл
+- `localValue` был в зависимостях `useEffect`, что усугубляло проблему
+
+### Решение
+
+**Файлы:**
+- `/src/components/SeoKeywordManager.tsx` — управление Link Keywords
+- `/src/components/FocusKeyphraseAnalyzer.tsx` — анализ Focus Keyphrase
+
+**Изменения:**
+
+1. **Асинхронный коммит через отложенное состояние:**
+   ```typescript
+   // Было: синхронный dispatch внутри setState
+   setLocalValue(next);
+   dispatch({ type: 'UPDATE', path, value: next });
+   
+   // Стало: отложенный коммит
+   setLocalValue(next);
+   setPendingCommit({ value: next, string: nextString });
+   
+   // Отдельный useEffect для коммита
+   useEffect(() => {
+     if (!pendingCommit) return;
+     dispatch({ type: 'UPDATE', path, value: pendingCommit.value });
+     setPendingCommit(null);
+   }, [pendingCommit]);
+   ```
+
+2. **Использование refs для неизменяемых данных:**
+   - `dispatchRef`, `pathRef`, `stringPathRef` — вместо прямых зависимостей
+   - Предотвращает лишние ре-рендеры при обновлении этих значений
+
+3. **Контроль синхронизации с внешним состоянием:**
+   ```typescript
+   // Синхронизация блокируется во время коммита
+   useEffect(() => {
+     if (pendingCommit) return; // Не обновлять во время коммита
+     if (!deepEqual(localValue, externalValue)) {
+       setLocalValue(externalValue);
+     }
+   }, [externalSignature, pendingCommit, localValue]);
+   ```
+
+4. **Проверка изменений контента через signature:**
+   - Автообогащение keywords запускается только при реальном изменении контента
+   - Используется `createContentSignature()` для сравнения
+
+**Результат:**
+- ✅ Нет бесконечных циклов
+- ✅ Корректное обновление формы без race conditions
+- ✅ Автообогащение keywords работает при изменении контента
+- ✅ UI остается отзывчивым
+
+### Улучшения интерфейса и логики пересчета (2025-10-14, 20:00)
+
+**Проблемы:**
+- Пересчет происходил при каждой загрузке страницы
+- Timestamp показывал текущее время вместо времени последнего реального пересчета
+- Не было кнопки "Пересчитать" в Link Keywords
+- Данные не сохранялись в БД
+
+**Исправления:**
+
+1. **Добавлены поля для кэширования в БД:**
+   - `seo.focus_keyphrase_stats` (json) — статистика Focus Keyphrase
+   - `seo.additional_fields` (json) — данные Link Keywords с кэшированными счетчиками
+
+2. **Изменена логика пересчета:**
+   - **Автоматический пересчет** только при первом открытии (если данных еще нет)
+   - **Ручной пересчет** по кнопке "Пересчитать" в обоих компонентах
+   - Данные сохраняются в БД и загружаются оттуда при следующем открытии
+
+3. **Улучшен UI:**
+   - Добавлена кнопка "Пересчитать" в Link Keywords
+   - Timestamp отображает реальное время последнего пересчета в формате `ДД/ММ/ГГГГ, ЧЧ:ММ`
+   - Улучшены стили кнопок (hover эффекты, disabled состояния)
+   - Кнопка "Пересчитать" неактивна если нет данных для пересчета
+
+4. **Скрыты технические поля:**
+   - `seo.link_keywords` (textarea) — скрыто, используется только для fallback
+   - `seo.focus_keyphrase_stats` и `seo.additional_fields` — скрыты и readonly
+
+### Тестирование
+1. Откройте пост в админке
+2. Перейдите на вкладку SEO
+3. Введите **Focus Keyphrase** — проверьте автоматический пересчет (только первый раз)
+4. Добавьте **Link Keyword** — проверьте, что нет ошибок в консоли
+5. Нажмите **"Пересчитать"** в обоих секциях — проверьте обновление данных
+6. **Сохраните** пост и откройте снова — проверьте, что данные загружаются из БД
+7. Проверьте timestamp — должен показывать время последнего пересчета, а не текущее время
+
+### Переиспользование паттерна
+Этот паттерн можно использовать в других UI компонентах с похожими проблемами:
+```typescript
+// 1. Локальное состояние для UI
+const [localValue, setLocalValue] = useState(externalValue);
+
+// 2. Отложенный коммит
+const [pendingCommit, setPendingCommit] = useState(null);
+
+// 3. Refs для dispatch и путей
+const dispatchRef = useRef(dispatch);
+
+// 4. Отдельный useEffect для коммита
+useEffect(() => {
+  if (!pendingCommit) return;
+  dispatchRef.current?.({ type: 'UPDATE', path, value: pendingCommit });
+  setPendingCommit(null);
+}, [pendingCommit]);
+
+// 5. Изменения через setPendingCommit вместо прямого dispatch
+const handleChange = (value) => {
+  setLocalValue(value);
+  setPendingCommit(value);
+};
+```
+
+---
+
 ## Следующие шаги
 - [x] Настроить Cloudflare R2 для хранения медиа
 - [x] Добавить AI summary feature
 - [x] Интерфейс с закладками
 - [x] Генерация slug из названия
 - [x] Система черновиков
-- [ ] Добавить недостающие переводы Team
-- [ ] Проверить корректность отображения контента с изображениями и ссылками
-- [ ] Настроить фронтенд ASTRO для работы с Payload API
+- [x] Определить архитектуру локализации
+- [x] Исправить бесконечные циклы в SEO компонентах
+- [ ] Обновить AI компоненты для работы с переводами
+- [ ] Настроить фронтенд ASTRO для работы с API переводов

@@ -1,0 +1,11 @@
+/* Отступы для поля JSON-LD */
+.json-ld-field {
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Общие стили для SEO полей */
+.field-type-code[data-field-name="json_ld"] {
+  margin-top: 1.5rem !important;
+  margin-bottom: 1.5rem !important;
+}

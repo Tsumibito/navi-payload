@@ -1,80 +1,124 @@
 import type { CollectionConfig } from 'payload';
 import { lexicalEditor } from '@payloadcms/richtext-lexical';
 
+import { contentEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
-import { translationFields } from '../fields/translation';
 
 export const Certificates: CollectionConfig = {
   slug: 'certificates',
+  dbName: 'certificates_new',
   labels: {
     singular: 'Certificate',
     plural: 'Certificates',
   },
   admin: {
-    useAsTitle: 'title',
-    defaultColumns: ['title', 'slug'],
+    useAsTitle: 'name',
+    defaultColumns: ['name', 'slug', '_status'],
+    group: 'Content',
+  },
+  access: {
+    read: () => true,
+    create: () => true,
+    update: () => true,
+    delete: () => true,
   },
   fields: [
     {
-      type: 'text',
-      name: 'title',
-      label: 'Title',
-      required: true,
+      type: 'tabs',
+      tabs: [
+        {
+          label: 'Content',
+          fields: [
+            {
+              type: 'text',
+              name: 'name',
+              label: 'Name',
+              required: true,
+              localized: true,
+              admin: {
+                description: 'Certificate name (localized)',
+              },
+            },
+            {
+              type: 'text',
+              name: 'slug',
+              label: 'Slug',
+              required: true,
+              localized: true,
+              admin: {
+                description: 'URL-friendly identifier per language',
+              },
+            },
+            {
+              type: 'upload',
+              name: 'frontImage',
+              label: 'Certificate Front Side',
+              relationTo: 'media',
+              admin: {
+                description: 'Front side of the certificate',
+              },
+            },
+            {
+              type: 'upload',
+              name: 'backImage',
+              label: 'Certificate Back Side',
+              relationTo: 'media',
+              admin: {
+                description: 'Back side of the certificate',
+              },
+            },
+            {
+              type: 'richText',
+              name: 'description',
+              label: 'Description',
+              localized: true,
+              editor: lexicalEditor({
+                features: contentEditorFeatures,
+              }),
+              admin: {
+                description: 'Certificate description (localized)',
+                style: {
+                  maxWidth: '900px',
+                },
+              },
+            },
+            {
+              type: 'richText',
+              name: 'requirements',
+              label: 'Requirements',
+              localized: true,
+              editor: lexicalEditor({
+                features: contentEditorFeatures,
+              }),
+              admin: {
+                description: 'Requirements to obtain (localized)',
+                style: {
+                  maxWidth: '900px',
+                },
+              },
+            },
+            {
+              type: 'richText',
+              name: 'program',
+              label: 'Program',
+              localized: true,
+              editor: lexicalEditor({
+                features: contentEditorFeatures,
+              }),
+              admin: {
+                description: 'Training program details (localized)',
+                style: {
+                  maxWidth: '900px',
+                },
+              },
+            },
+          ],
+        },
+        {
+          label: 'SEO',
+          fields: [createSeoField({ localized: true })],
+        },
+      ],
     },
-    {
-      type: 'text',
-      name: 'slug',
-      label: 'Slug',
-      required: true,
-      unique: true,
-    },
-    {
-      type: 'upload',
-      name: 'image',
-      label: 'Certificate Image',
-      relationTo: 'media',
-    },
-    {
-      type: 'richText',
-      name: 'description',
-      label: 'Description',
-      editor: lexicalEditor({
-        features: ({ defaultFeatures }) => defaultFeatures,
-      }),
-    },
-    {
-      type: 'text',
-      name: 'issuer',
-      label: 'Issuer',
-    },
-    {
-      type: 'date',
-      name: 'issuedDate',
-      label: 'Issued Date',
-    },
-    {
-      type: 'date',
-      name: 'expiryDate',
-      label: 'Expiry Date',
-    },
-    {
-      type: 'array',
-      name: 'translations',
-      label: 'Translations',
-      fields: translationFields({
-        includeSummary: false,
-        extraFields: [
-          {
-            type: 'richText',
-            name: 'description',
-            label: 'Description',
-            editor: lexicalEditor({
-              features: ({ defaultFeatures }) => defaultFeatures,
-            }),
-          },
-        ],
-      }),
-    },
-    createSeoField(),
   ],
 };

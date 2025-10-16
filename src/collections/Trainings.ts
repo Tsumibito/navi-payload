@@ -33,6 +33,7 @@ export const Trainings: CollectionConfig = {
       label: 'Translations',
       fields: translationFields({ includeSummary: false, includeSeo: false }),
     },
-    createSeoField(),
+
+    //     createSeoField(),
   ],
 };

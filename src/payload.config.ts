@@ -9,14 +9,13 @@ import sharp from 'sharp'
 
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
-import { Posts } from './collections/Posts'
-import { Tags } from './collections/Tags'
-import { Team } from './collections/Team'
-import { Faqs } from './collections/Faqs'
+import { Tags } from './content/Tags'
+import { Team } from './content/Team'
+import { Posts } from './content/Posts'
 import { Certificates } from './collections/Certificates'
-import { Trainings } from './collections/Trainings'
-import { Redirects } from './collections/Redirects'
+import { Trainings } from './content/Trainings'
 import { SiteGlobals } from './globals/SiteGlobals'
+import { Redirects } from './collections/Redirects'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -29,17 +28,25 @@ export default buildConfig({
       autoGenerate: false,
     },
   },
-  collections: [Users, Media, Posts, Tags, Team, Faqs, Certificates, Trainings, Redirects],
+  collections: [Users, Media, Redirects, Posts, Tags, Team, Certificates, Trainings],
   globals: [SiteGlobals],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
+  // Нативная локализация Payload для новых коллекций (TagsNew и далее)
+  // Старые коллекции (Tags, Posts и т.д.) продолжают использовать translations array
+  localization: {
+    locales: ['ru', 'uk', 'en'],
+    defaultLocale: 'ru',
+    fallback: true,
+  },
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URI || '',
     },
+    push: false,
   }),
   sharp,
   plugins: [
@@ -65,4 +72,7 @@ export default buildConfig({
       clientUploads: false,
     }),
   ],
+  graphQL: {
+    disable: true,
+  },
 })

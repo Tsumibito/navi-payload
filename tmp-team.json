@@ -1,0 +1,263 @@
+[17:01:20] [33mWARN[39m: [36mNo email adapter provided. Email will be written to console. More info at https://payloadcms.com/docs/email/overview.[39m
+{
+  "baserow": {
+    "count": 3,
+    "sample": [
+      {
+        "id": 3,
+        "slug": "alex-burlakov",
+        "name": {
+          "ru": "Алексей Бурлаков",
+          "ua": "Олексій Бурлаков",
+          "en": "Alex Burlakov"
+        },
+        "jobTitle": {
+          "ru": "старший инструктор  Navi.training",
+          "ua": "старший інструктор Navi.training",
+          "en": "chief instructor  Navi.training"
+        },
+        "bioSummary": {
+          "ru": "Отличный шкипер-инструктор и опытный специалист по семейным яхтенным круизам. Руководитель шкиперской команды Navi.training",
+          "ua": "Відмінний шкіпер-інструктор і досвідчений фахівець із сімейних яхтових круїзів. Керівник шкіперської команди Navi.training",
+          "en": "Excellent skipper-instructor and experienced specialist in family yacht cruises. Navi.training skipper team leader"
+        },
+        "bio": {
+          "ru": "## Эксперт в области яхтинга, кандидат экономических наук, доцент, журналист и телепродюсер.\n\nУже 12 лет я живу яхтингом и помогаю людям осуществить мечту о морских путешествиях. За это время я накопил обширный опыт, который позволяет мне эффективно обучать и вдохновлять своих учеников.\n\n## Мой Опыт и Достижения\n\n- **Сертифицированный инструктор ISSA уровня Master of Yacht**\n- Провел более **180 успешных яхтенных походов** в самых разных регионах планеты\n- Обучил более **200 молодых шкиперов**, передав им знания и навыки для безопасного и увлекательного плавания\n- Автор множества **статей и ряда учебных пособий**, которые помогают новичкам и опытным яхтсменам совершенствовать свои умения\n- Провел **более 100 яхтенных обучающих программ**, обеспечив высокий уровень подготовки участников\n\n## Академическая Карьера\n\nЯ являюсь **кандидатом экономических наук** и **доцентом**, обладаю обширным преподавательским опытом. Моя академическая деятельность включает подготовку и проведение учебных курсов, разработку образовательных программ и публикацию научных работ. Это позволяет мне сочетать теоретические знания с практическим опытом, предлагая своим ученикам наиболее эффективные методы обучения.\n\n## Навыки\n\n- **ISSA Sailing and Power Instructor** (Inshore, Offshore и Master of Yacht уровни)\n- Сильные навыки планирования и организации\n- Отличные коммуникативные навыки, развитые через ежедневное взаимодействие с коллегами и учениками\n- Аналитический склад ума и умение решать проблемы\n- Опытный пользователь Mac и Linux, навыки программирования на Python, Django, JavaScript, jQuery, NodeJS, Git, участвую в open source проектах.\n- Владею английским на уровне Upper Intermediate, базовый уровень французского,  свободно коммуницирую на русском и украинском языках\n- **Хобби:** конечно на первом месте яхтинг, но также йога, психология\n\n## Почему Я\n\nМоя миссия — сделать яхтинг доступным и понятным для каждого. Я верю, что море открыто для всех, и с моей помощью вы сможете легко освоить яхтинг, независимо от вашего начального уровня подготовки. Если вы мечтаете о море — у вас всё получится!",
+          "ua": "## Експерт у сфері яхтингу, кандидат економічних наук, доцент, журналіст та телепродюсер\n\nВже 12 років я живу яхтингом і допомагаю людям здійснити мрію про морські подорожі. За цей час я накопичив обширний досвід, який дозволяє мені ефективно навчати та надихати своїх учнів.\n\n## Мій Досвід та Досягнення\n\n- **Сертифікований інструктор ISSA рівня Master of Yacht**\n- Провів понад **180 успішних яхтенних походів** у найрізноманітніших регіонах планети\n- Навчив понад **200 молодих шкіперів**, передавши їм знання та навички для безпечного та захоплюючого плавання\n- Автор численних **статей та ряду навчальних посібників**, які допомагають новачкам та досвідченим яхтсменам вдосконалювати свої вміння\n- Провів **понад 100 яхтенних навчальних програм**, забезпечивши високий рівень підготовки учасників\n\n## Академічна Кар'єра\n\nЯ є **кандидатом економічних наук** та **доцентом**, маю обширний викладацький досвід. Моя академічна діяльність включає підготовку та проведення навчальних курсів, розробку освітніх програм та публікацію наукових робіт. Це дозволяє мені поєднувати теоретичні знання з практичним досвідом, пропонуючи своїм учням найбільш ефективні методи навчання.\n\n## Навички\n\n- **ISSA Sailing and Power Instructor** (Inshore, Offshore та Master of Yacht рівні)\n- Сильні навички планування та організації\n- Відмінні комунікативні навички, розвинуті через щоденну взаємодію з колегами та учнями\n- Аналітичний склад розуму та вміння вирішувати проблеми\n- Досвідчений користувач Mac та Linux, навички програмування на Python, Django, JavaScript, jQuery, NodeJS, Git, беру участь в open source проектах\n- Володію англійською на рівні Upper Intermediate, базовий рівень французької, вільно спілкуюся російською та українською мовами\n- **Хобі:** звісно, на першому місці яхтинг, але також йога, психологія\n\n## Чому Я\n\nМоя місія — зробити яхтинг доступним і зрозумілим для кожного. Я вірю, що море відкрите для всіх, і з моєю допомогою ви зможете легко освоїти яхтинг, незалежно від вашого початкового рівня підготовки. Якщо ви мрієте про море — у вас все вийде!",
+          "en": "## Expert in Yachting, Ph.D. in Economics, Associate Professor, Journalist, and Television Producer\n\nFor over 12 years, I have been immersed in yachting, helping people realize their dreams of maritime adventures. During this time, I have accumulated extensive experience that allows me to effectively teach and inspire my students.\n\n## My Experience and Achievements\n\n- **Certified ISSA Instructor at Master of Yacht level**\n- Conducted over **180 successful yacht voyages** in various regions around the globe\n- Trained more than **200 young skippers**, imparting knowledge and skills for safe and enjoyable sailing\n- Author of numerous **articles and several educational manuals**, which assist both beginners and experienced yachtsmen in honing their skills\n- Led **over 100 yacht training programs**, ensuring a high level of participant preparation\n\n## Academic Career\n\nI hold a **Ph.D. in Economics** and am an **Associate Professor** with extensive teaching experience. My academic endeavors include preparing and conducting courses, developing educational programs, and publishing scientific papers. This enables me to blend theoretical knowledge with practical experience, offering my students the most effective teaching methods.\n\n## Skills\n\n- **ISSA Sailing and Power Instructor** (Inshore, Offshore, and Master of Yacht levels)\n- Strong planning and organizational skills\n- Excellent communication skills developed through daily interactions with colleagues and students\n- Analytical mindset and problem-solving abilities\n- Proficient in Mac and Linux, programming skills in Python, Django, JavaScript, jQuery, NodeJS, Git, actively participating in open source projects\n- Upper Intermediate in English, basic French, fluent in Russian and Ukrainian\n- **Hobbies:** Naturally, yachting is my top priority, but I also enjoy yoga and psychology\n\n## Why Me\n\nMy mission is to make yachting accessible and understandable for everyone. I believe that the sea is open to all, and with my assistance, you can easily master yachting regardless of your initial level of preparation. If you dream of the sea — you will succeed!"
+        },
+        "contacts": {
+          "email": "alex.mon.navi@gmail.com"
+        }
+      },
+      {
+        "id": 1,
+        "slug": "evgenia-pilgun",
+        "name": {
+          "ru": "Евгения Пильгун",
+          "ua": "Євгенія Пільгун",
+          "en": "Eugenia Pilgun"
+        },
+        "jobTitle": {
+          "ru": "шкипер-инструктор  Navi.training",
+          "ua": "шкіпер-інструктор  Navi.training",
+          "en": "instructor skipper  Navi.training"
+        },
+        "bioSummary": {
+          "ru": "Опытная путешественница, участница двух арктических экспедиций, прошла более 12000 nm на парусном катамаране. Ведет парусные тренинги руководит филиалом navi.training в Швейцарии.",
+          "ua": "Досвідчена мандрівниця, учасниця двох арктичних експедицій, пройшла понад 12000 nm на вітрильному катамарані. Веде вітрильні тренінги, керує філією navi.training у Швейцарії.",
+          "en": "Experienced traveller, participant of two Arctic expeditions, has sailed more than 12000 nm on a sailing catamaran. She leads sailing trainings and manages the navi.training branch in Switzerland."
+        },
+        "bio": {
+          "ru": "bio text",
+          "ua": "bio text",
+          "en": "bio text"
+        },
+        "contacts": {
+          "email": "navigar.fr@gmail.com"
+        }
+      },
+      {
+        "id": 2,
+        "slug": "andrii-gov",
+        "name": {
+          "ru": "Андрей Говорской",
+          "ua": "Андрій Говорський",
+          "en": "Andrei Govorsky"
+        },
+        "jobTitle": {
+          "ru": "шкипер-инструктор  Navi.training",
+          "ua": "шкіпер-інструктор  Navi.training",
+          "en": "instructor skipper  Navi.training"
+        },
+        "bioSummary": {
+          "ru": "С детства в парусном спорте. Последние 8 лет постоянно живет на яхте, дважды пересекал Атлантику. Больше 10 лет преподает яхтинг, курсанты отмечают его основательный и очень серьезный подход.",
+          "ua": "З дитинства у вітрильному спорті. Останні 8 років постійно живе на яхті, двічі перетинав Атлантику. Понад 10 років викладає яхтинг, курсанти відзначають його ґрунтовний і дуже серйозний підхід.",
+          "en": "Since childhood in sailing. For the last 8 years he has been living permanently on a yacht and has crossed the Atlantic twice. He has been teaching yachting for more than 10 years, cadets note his thorough and very serious approach."
+        },
+        "bio": {
+          "ru": "bio text",
+          "ua": "bio text",
+          "en": "bio text"
+        },
+        "contacts": {
+          "email": "navigar.fr@gmail.com"
+        }
+      }
+    ],
+    "fields": [
+      "id",
+      "order",
+      "Slug",
+      "Name_RU",
+      "UUID",
+      "Created On",
+      "Updated On",
+      "Published On",
+      "Bio Summary_RU",
+      "Job Title_RU",
+      "Email",
+      "Phone Number",
+      "Twitter Link",
+      "Facebook Link",
+      "opt",
+      "placement",
+      "Name_UA",
+      "Name_EN",
+      "Bio Summary_UA",
+      "Bio Summary_EN",
+      "Job Title_UA",
+      "Job Title_EN",
+      "Qualification",
+      "Profile Picture",
+      "Blog Posts",
+      "Instagram Link",
+      "Bio_RU",
+      "Bio_UA",
+      "Bio_EN",
+      "Blog Posts 2"
+    ]
+  },
+  "payload": {
+    "totalDocs": 3,
+    "sample": [
+      {
+        "id": 3,
+        "slug": "aleksej-burlakov",
+        "hasPhoto": true,
+        "name": {
+          "ru": "Алексей Бурлаков",
+          "uk": "Олексій Бурлаков",
+          "en": "Alex Burlakov"
+        },
+        "position": {
+          "ru": "старший инструктор  Navi.training",
+          "uk": "старший інструктор Navi.training",
+          "en": "chief instructor  Navi.training"
+        },
+        "bioSummaryLocales": [
+          "ru",
+          "uk",
+          "en"
+        ],
+        "bioLocales": [
+          "ru",
+          "uk",
+          "en"
+        ],
+        "links": [
+          {
+            "id": "68ed077c812a4a15c0cc80aa",
+            "service": "email",
+            "url": "mailto:alex.mon.navi@gmail.com"
+          },
+          {
+            "id": "68ed077c812a4a15c0cc80ab",
+            "service": "phone",
+            "url": "tel:33769958299"
+          },
+          {
+            "id": "68ed077c812a4a15c0cc80ac",
+            "service": "facebook",
+            "url": "https://www.facebook.com/alex.tsumibito?mibextid=LQQJ4d"
+          },
+          {
+            "id": "68ed077c812a4a15c0cc80ad",
+            "service": "instagram",
+            "url": "https://www.instagram.com/tsumibito/profilecard/?igsh=d3JzZjZmdnd2OW5v"
+          }
+        ],
+        "posts": []
+      },
+      {
+        "id": 2,
+        "slug": "andrej-govorskoj",
+        "hasPhoto": true,
+        "name": {
+          "ru": "Андрей Говорской"
+        },
+        "position": {
+          "ru": "шкипер-инструктор  Navi.training"
+        },
+        "bioSummaryLocales": [
+          "ru"
+        ],
+        "bioLocales": [
+          "ru"
+        ],
+        "links": [
+          {
+            "id": "68ec12366fd0e22ec4187ce5",
+            "service": "email",
+            "url": "mailto:navigar.fr@gmail.com"
+          }
+        ],
+        "posts": []
+      },
+      {
+        "id": 1,
+        "slug": "andrii-gov",
+        "hasPhoto": true,
+        "name": {
+          "ru": "Андрей Говорской",
+          "uk": "Андрій Говорський",
+          "en": "Andrei Govorsky"
+        },
+        "position": {
+          "ru": "шкипер-инструктор  Navi.training",
+          "uk": "шкіпер-інструктор  Navi.training",
+          "en": "instructor skipper  Navi.training"
+        },
+        "bioSummaryLocales": [
+          "ru",
+          "uk",
+          "en"
+        ],
+        "bioLocales": [
+          "ru",
+          "uk",
+          "en"
+        ],
+        "links": [
+          {
+            "id": "68ed1430d2f96c0f9f421d2e",
+            "service": "email",
+            "url": "mailto:navigar.fr@gmail.com"
+          }
+        ],
+        "posts": []
+      }
+    ],
+    "fields": [
+      "id",
+      "photo",
+      "name",
+      "slug",
+      "position",
+      "bio_summary",
+      "bio",
+      "posts",
+      "order",
+      "links",
+      "seo",
+      "faqs",
+      "updatedAt",
+      "createdAt"
+    ],
+    "postsLinkedCount": 0,
+    "teamWithoutPosts": [
+      {
+        "id": 3,
+        "slug": "aleksej-burlakov"
+      },
+      {
+        "id": 2,
+        "slug": "andrej-govorskoj"
+      },
+      {
+        "id": 1,
+        "slug": "andrii-gov"
+      }
+    ]
+  }
+}

@@ -132,40 +132,36 @@ export const Posts: CollectionConfig = {
               label: 'Featured post',
               defaultValue: false,
             },
+          ],
+        },
+        {
+          label: 'Technical',
+          fields: [
             {
-              type: 'collapsible',
+              type: 'group',
+              name: 'socialImages',
               label: 'Social images',
               admin: {
-                initCollapsed: true,
+                description: 'Optional artwork for various aspect ratios',
               },
               fields: [
                 {
-                  type: 'group',
-                  name: 'socialImages',
-                  label: 'Images',
-                  admin: {
-                    description: 'Optional artwork for various aspect ratios',
-                  },
-                  fields: [
-                    {
-                      type: 'upload',
-                      name: 'thumbnail',
-                      label: 'Thumbnail',
-                      relationTo: 'media',
-                    },
-                    {
-                      type: 'upload',
-                      name: 'image16x9',
-                      label: 'Image 16:9',
-                      relationTo: 'media',
-                    },
-                    {
-                      type: 'upload',
-                      name: 'image5x4',
-                      label: 'Image 5:4',
-                      relationTo: 'media',
-                    },
-                  ],
+                  type: 'upload',
+                  name: 'thumbnail',
+                  label: 'Thumbnail',
+                  relationTo: 'media',
+                },
+                {
+                  type: 'upload',
+                  name: 'image16x9',
+                  label: 'Image 16:9',
+                  relationTo: 'media',
+                },
+                {
+                  type: 'upload',
+                  name: 'image5x4',
+                  label: 'Image 5:4',
+                  relationTo: 'media',
                 },
               ],
             },
@@ -173,7 +169,7 @@ export const Posts: CollectionConfig = {
         },
         {
           label: 'SEO',
-          fields: [createSeoField()],
+          fields: [createSeoField({ localized: true })],
         },
         {
           label: 'Translations',

@@ -65,5 +65,58 @@ export const SiteGlobals: GlobalConfig = {
         },
       ],
     },
+    {
+      type: 'array',
+      name: 'availableLanguages',
+      label: 'Available Languages',
+      admin: {
+        description: 'Управление языками сайта',
+      },
+      fields: [
+        {
+          type: 'text',
+          name: 'code',
+          label: 'Code',
+          required: true,
+          admin: {
+            description: 'ISO код языка (ru, uk, en, pl, fr, es, de)',
+          },
+        },
+        {
+          type: 'text',
+          name: 'name',
+          label: 'Name',
+          required: true,
+          admin: {
+            description: 'Название языка',
+          },
+        },
+        {
+          type: 'text',
+          name: 'flag',
+          label: 'Flag Emoji',
+          admin: {
+            description: 'Флаг для отображения (например 🇷🇺)',
+          },
+        },
+        {
+          type: 'checkbox',
+          name: 'enabled',
+          label: 'Enabled',
+          defaultValue: true,
+        },
+        {
+          type: 'checkbox',
+          name: 'isDefault',
+          label: 'Default Language',
+          defaultValue: false,
+        },
+      ],
+      defaultValue: [
+        { code: 'ru', name: 'Русский', flag: '🇷🇺', enabled: true, isDefault: true },
+        { code: 'uk', name: 'Українська', flag: '🇺🇦', enabled: true, isDefault: false },
+        { code: 'en', name: 'English', flag: '🇬🇧', enabled: true, isDefault: false },
+      ],
+    },
   ],
 };

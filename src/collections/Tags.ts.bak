@@ -146,14 +146,6 @@ export const Tags: CollectionConfig = {
               },
             },
             {
-              type: 'textarea',
-              name: 'descriptionForAI',
-              label: 'AI context',
-              admin: {
-                description: 'Optional hints for AI assistants',
-              },
-            },
-            {
               type: 'richText',
               name: 'content',
               label: 'Content',
@@ -184,40 +176,44 @@ export const Tags: CollectionConfig = {
               relationTo: [FAQS_RELATION],
               hasMany: true,
             },
+          ],
+        },
+        {
+          label: 'Technical',
+          fields: [
             {
-              type: 'collapsible',
+              type: 'textarea',
+              name: 'descriptionForAI',
+              label: 'Description for AI',
+              admin: {
+                description: 'Optional hints for AI assistants',
+              },
+            },
+            {
+              type: 'group',
+              name: 'socialImages',
               label: 'Social images',
               admin: {
-                initCollapsed: true,
+                description: 'Optional artwork for different aspect ratios',
               },
               fields: [
                 {
-                  type: 'group',
-                  name: 'socialImages',
-                  label: 'Images',
-                  admin: {
-                    description: 'Optional artwork for different aspect ratios',
-                  },
-                  fields: [
-                    {
-                      type: 'upload',
-                      name: 'thumbnail',
-                      label: 'Thumbnail',
-                      relationTo: 'media',
-                    },
-                    {
-                      type: 'upload',
-                      name: 'image16x9',
-                      label: 'Image 16:9',
-                      relationTo: 'media',
-                    },
-                    {
-                      type: 'upload',
-                      name: 'image5x4',
-                      label: 'Image 5:4',
-                      relationTo: 'media',
-                    },
-                  ],
+                  type: 'upload',
+                  name: 'thumbnail',
+                  label: 'Thumbnail',
+                  relationTo: 'media',
+                },
+                {
+                  type: 'upload',
+                  name: 'image16x9',
+                  label: 'Image 16:9',
+                  relationTo: 'media',
+                },
+                {
+                  type: 'upload',
+                  name: 'image5x4',
+                  label: 'Image 5:4',
+                  relationTo: 'media',
                 },
               ],
             },

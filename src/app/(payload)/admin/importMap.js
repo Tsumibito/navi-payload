@@ -7,6 +7,19 @@ import GenerateSummaryButtonDefault, {
 import GenerateTagSummaryButtonDefault, {
   GenerateTagSummaryButton as GenerateTagSummaryButtonNamed,
 } from '../../../components/GenerateTagSummaryButton';
+import SeoLengthIndicatorDefault, {
+  SeoMetaDescriptionLengthIndicator,
+  SeoTitleLengthIndicator,
+} from '../../../components/SeoLengthIndicator';
+import SeoKeywordManagerDefault, {
+  SeoKeywordManager,
+} from '../../../components/SeoKeywordManager';
+import FocusKeyphraseAnalyzerDefault, {
+  FocusKeyphraseAnalyzer,
+} from '../../../components/FocusKeyphraseAnalyzer';
+import OgImageActionsDefault, {
+  OgImageActions,
+} from '../../../components/OgImageActions';
 import {
   AlignFeatureClient,
   BoldFeatureClient,
@@ -43,6 +56,15 @@ export const importMap = {
   "/src/components/GenerateSummaryButton#default": GenerateSummaryButtonDefault,
   "/src/components/GenerateTagSummaryButton#GenerateTagSummaryButton": GenerateTagSummaryButtonNamed,
   "/src/components/GenerateTagSummaryButton#default": GenerateTagSummaryButtonDefault,
+  "/src/components/SeoLengthIndicator#SeoTitleLengthIndicator": SeoTitleLengthIndicator,
+  "/src/components/SeoLengthIndicator#SeoMetaDescriptionLengthIndicator": SeoMetaDescriptionLengthIndicator,
+  "/src/components/SeoLengthIndicator#default": SeoLengthIndicatorDefault,
+  "/src/components/SeoKeywordManager#SeoKeywordManager": SeoKeywordManager,
+  "/src/components/SeoKeywordManager#default": SeoKeywordManagerDefault,
+  "/src/components/FocusKeyphraseAnalyzer#FocusKeyphraseAnalyzer": FocusKeyphraseAnalyzer,
+  "/src/components/FocusKeyphraseAnalyzer#default": FocusKeyphraseAnalyzerDefault,
+  "/src/components/OgImageActions#OgImageActions": OgImageActions,
+  "/src/components/OgImageActions#default": OgImageActionsDefault,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell": RscEntryLexicalCell,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalField": RscEntryLexicalField,
   "@payloadcms/richtext-lexical/rsc#LexicalDiffComponent": LexicalDiffComponent,

@@ -3,6 +3,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 
 import { createSeoField } from '../fields/seo';
 import { translationFields } from '../fields/translation';
+import { simpleEditorFeatures } from '../utils/lexicalConfig';
 
 const TAGS_RELATION = 'tags' as unknown as CollectionSlug;
 const POSTS_RELATION = 'posts' as unknown as CollectionSlug;
@@ -29,7 +30,7 @@ export const Faqs: CollectionConfig = {
       name: 'answer',
       label: 'Answer',
       editor: lexicalEditor({
-        features: ({ defaultFeatures }) => defaultFeatures,
+        features: simpleEditorFeatures,
       }),
     },
     {
@@ -63,6 +64,7 @@ export const Faqs: CollectionConfig = {
         ],
       }),
     },
-    createSeoField(),
+
+    //     createSeoField(),
   ],
 };

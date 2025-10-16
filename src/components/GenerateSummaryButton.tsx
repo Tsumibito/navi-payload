@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useLayoutEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useFormFields } from '@payloadcms/ui';
 
 interface GenerateSummaryButtonProps {
@@ -25,50 +25,18 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const content = useFormFields(([fields]) => fields[contentField]);
-  const title = useFormFields(([fields]) => fields[titleField]);
-  const language = useFormFields(([fields]) =>
-    languageField ? fields[languageField] : null
-  );
-  const { dispatchFields } = useFormFields(([, dispatch]) => ({ dispatchFields: dispatch }));
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  useLayoutEffect(() => {
-    const button = buttonRef.current;
-    if (!button) return;
-
-    const container = button.parentElement;
-    if (!container) return;
-
-    // Контейнер должен быть relative для абсолютного позиционирования кнопки
-    container.style.position = 'relative';
-    container.style.display = 'block';
-
-    const textarea = container.querySelector('textarea');
-    if (textarea instanceof HTMLTextAreaElement) {
-      // Добавляем padding справа для кнопки
-      textarea.style.paddingRight = '2.5rem';
-    }
-
-    // Кнопка абсолютно позиционирована справа вверху внутри поля
-    button.style.position = 'absolute';
-    button.style.right = '0.25rem';
-    button.style.top = '0.25rem';
-    button.style.width = '2rem';
-    button.style.height = '2rem';
-    button.style.zIndex = '10';
-
-    // Описание под полем
-    const fieldWrapper = container.parentElement;
-    const description = fieldWrapper?.querySelector('[data-element="description"], .field-description, .field__description');
-    if (description instanceof HTMLElement) {
-      description.style.display = 'block';
-      description.style.marginTop = '0.5rem';
-      description.style.width = '100%';
-    }
-  }, []);
+  // ВАЖНО: useFormFields вызываем ТОЛЬКО ОДИН РАЗ
+  const formData = useFormFields(([fields, dispatch]) => ({
+    content: fields[contentField],
+    title: fields[titleField],
+    language: languageField ? fields[languageField] : null,
+    dispatchFields: dispatch,
+  }));
+  
+  const { content, title, language, dispatchFields } = formData;
 
   const handleGenerate = async () => {
+    if (isGenerating) return;
     setIsGenerating(true);
     setError(null);
 
@@ -134,31 +102,42 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
   };
 
   return (
-    <>
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '0.5rem',
+        marginTop: '0.4rem',
+      }}
+    >
       <button
-        ref={buttonRef}
         type="button"
         onClick={handleGenerate}
         disabled={isGenerating}
         aria-label={isGenerating ? 'Генерация описания' : 'Сгенерировать описание'}
         title={isGenerating ? 'Генерация описания' : 'Сгенерировать описание'}
         style={{
-          height: '2rem',
-          width: '2rem',
+          padding: '0.4rem 0.85rem',
+          minHeight: '2rem',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
           border: 'none',
-          borderRadius: '0.25rem',
-          backgroundColor: isGenerating ? '#9ca3af' : '#2563eb',
-          color: '#ffffff',
+          borderRadius: '9999px',
+          backgroundColor: isGenerating ? '#e5e7eb' : '#2563eb',
+          color: isGenerating ? '#6b7280' : '#ffffff',
           cursor: isGenerating ? 'not-allowed' : 'pointer',
-          boxShadow: isGenerating ? 'none' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-          transition: 'all 0.2s ease',
+          boxShadow: isGenerating ? 'none' : '0 1px 4px rgba(37, 99, 235, 0.35)',
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+          fontSize: '0.85rem',
+          fontWeight: 600,
+          lineHeight: 1,
+          gap: '0.35rem',
         }}
         onMouseDown={(event) => {
           if (isGenerating) return;
-          event.currentTarget.style.transform = 'scale(0.95)';
+          event.currentTarget.style.transform = 'scale(0.97)';
         }}
         onMouseUp={(event) => {
           event.currentTarget.style.transform = 'scale(1)';
@@ -167,7 +146,8 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
           event.currentTarget.style.transform = 'scale(1)';
         }}
       >
-        <span style={{ fontSize: '1rem', lineHeight: 1 }}>{isGenerating ? '…' : '✨'}</span>
+        <span aria-hidden="true" style={{ lineHeight: 1 }}>{isGenerating ? '…' : '✨'}</span>
+        <span>{isGenerating ? 'Generating…' : 'Generate Summary'}</span>
       </button>
       {error && (
         <span
@@ -175,13 +155,12 @@ export const GenerateSummaryButton: React.FC<GenerateSummaryButtonProps> = ({
             color: 'var(--theme-error-500, #ef4444)',
             fontSize: '0.75rem',
             flexBasis: '100%',
-            textAlign: 'right',
           }}
         >
           {error}
         </span>
       )}
-    </>
+    </span>
   );
 };
 

@@ -1,8 +1,8 @@
 import type { CollectionConfig, CollectionSlug } from 'payload';
 import { lexicalEditor } from '@payloadcms/richtext-lexical';
 
-import { createSeoField } from '../fields/seo';
 import { translationFields } from '../fields/translation';
+import { simpleEditorFeatures } from '../utils/lexicalConfig';
 
 const POSTS_RELATION = 'posts' as unknown as CollectionSlug;
 const CERTIFICATES_RELATION = 'certificates' as unknown as CollectionSlug;
@@ -49,7 +49,7 @@ export const Team: CollectionConfig = {
       name: 'bioSummary',
       label: 'Bio Summary',
       editor: lexicalEditor({
-        features: ({ defaultFeatures }) => defaultFeatures,
+        features: simpleEditorFeatures,
       }),
     },
     {
@@ -57,7 +57,7 @@ export const Team: CollectionConfig = {
       name: 'bio',
       label: 'Bio',
       editor: lexicalEditor({
-        features: ({ defaultFeatures }) => defaultFeatures,
+        features: simpleEditorFeatures,
       }),
     },
     {
@@ -145,6 +145,7 @@ export const Team: CollectionConfig = {
         ],
       }),
     },
-    createSeoField(),
+
+    //     createSeoField(),
   ],
 };
