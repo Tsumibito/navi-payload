@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UIFieldClientComponent } from 'payload';
 import { Button, useDocumentInfo } from '@payloadcms/ui';
 import { useFormFields } from '@payloadcms/ui';
 
 import {
   buildSeoContentContext,
+  createContentSignature,
   deriveSeoFieldCandidates,
   enrichKeywordEntries,
   normalizeAdditionalValue,
@@ -19,23 +20,41 @@ import {
   type SeoContentContext,
 } from '../utils/seoAnalysis';
 
-type ManagerFormState = {
-  stringValue: string;
-  context: SeoContentContext | null;
-  dispatch: ((action: { type: 'UPDATE'; path: string; value: unknown }) => void) | null;
-  focusKeyphrase: string;
+type InlineFaqEntry = {
+  id?: string;
+  question?: unknown;
+  answer?: unknown;
+  value?: {
+    id?: string;
+    question?: unknown;
+    answer?: unknown;
+  };
 };
 
 const EMPTY_VALUE: AdditionalFieldsValue = { keywords: [] };
 
 export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
   const docInfo = useDocumentInfo();
+  const resolveLocale = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get('locale');
+      if (fromUrl) {
+        return fromUrl;
+      }
+    }
+
+    return 'ru';
+  }, [docInfo]);
   const [localValue, setLocalValue] = useState<AdditionalFieldsValue>(EMPTY_VALUE);
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newKeyword, setNewKeyword] = useState('');
   const [expandedLinks, setExpandedLinks] = useState<Record<number, boolean>>({});
   const [expandedPotential, setExpandedPotential] = useState<Record<number, boolean>>({});
+  const [effectiveContext, setEffectiveContext] = useState<SeoContentContext | null>(null);
+  const faqCacheRef = useRef<Record<string, unknown[]>>({});
+  const lastContextSignatureRef = useRef<string | null>(null);
 
   const formState = useFormFields(([rawFields, dispatch]) => {
     const fields = (rawFields ?? {}) as Record<string, FormFieldState | undefined>;
@@ -54,7 +73,7 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
     const rawAdditional = resolveFieldValue(fields, candidates.additionalFields);
     const slug = resolveFieldValue(fields, ['slug']);
 
-    const context = buildSeoContentContext({
+    const contextParams = {
       name: (name as string) ?? '',
       seoTitle: (seoTitle as string) ?? '',
       metaDescription: (metaDescription as string) ?? '',
@@ -62,11 +81,22 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
       content,
       faqs,
       additionalFields: rawAdditional,
-    });
+    };
+
+    const contextSignature = createContentSignature([
+      contextParams.name,
+      contextParams.seoTitle,
+      contextParams.metaDescription,
+      contextParams.summary,
+      contextParams.content ?? null,
+      contextParams.faqs ?? null,
+      contextParams.additionalFields ?? null,
+    ]);
 
     return {
       stringValue,
-      context,
+      contextParams,
+      contextSignature,
       focusKeyphrase: (focusKeyphrase as string) ?? '',
       slug: (slug as string) ?? '',
       dispatch: typeof dispatch === 'function' ? dispatch : null,
@@ -74,10 +104,178 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
   });
 
   const stringValue = formState?.stringValue ?? '';
-  const context = formState?.context ?? null;
+  const contextParams = formState?.contextParams;
+  const contextSignature = formState?.contextSignature ?? null;
   const dispatch = formState?.dispatch ?? null;
   const focusKeyphrase = formState?.focusKeyphrase ?? '';
   const slug = formState?.slug ?? '';
+
+  const stableContextParams = useMemo(() => contextParams, [contextSignature, contextParams]);
+
+  const baseContext = useMemo<SeoContentContext | null>(() => {
+    if (!stableContextParams) return null;
+    return buildSeoContentContext(stableContextParams);
+  }, [stableContextParams]);
+
+  const resolveFaqDetails = useCallback(async (rawFaqs: unknown, locale: string): Promise<unknown[] | null> => {
+    if (faqCacheRef.current[locale]) {
+      return faqCacheRef.current[locale] ?? null;
+    }
+
+    const entries: InlineFaqEntry[] = Array.isArray(rawFaqs)
+      ? (rawFaqs as InlineFaqEntry[])
+      : rawFaqs
+      ? [rawFaqs as InlineFaqEntry]
+      : [];
+    const detailed: unknown[] = [];
+    const ids: string[] = [];
+
+    for (const entry of entries) {
+      if (!entry) continue;
+      if (typeof entry === 'string') {
+        ids.push(entry);
+        continue;
+      }
+      if (typeof entry === 'object') {
+        const record = entry as InlineFaqEntry;
+        const candidate = record.value && typeof record.value === 'object' ? record.value : record;
+        const question = (candidate as InlineFaqEntry)?.question;
+        const answer = (candidate as InlineFaqEntry)?.answer;
+        const hasQuestion = typeof question === 'string' && question.trim().length > 0;
+        const hasAnswer = Boolean(answer);
+        if (hasQuestion || hasAnswer) {
+          detailed.push({
+            question: typeof question === 'string' ? question : '',
+            answer,
+          });
+          continue;
+        }
+        const idCandidate = record.id || (typeof (candidate as InlineFaqEntry)?.id === 'string' ? (candidate as InlineFaqEntry).id : null);
+        if (idCandidate) {
+          ids.push(idCandidate);
+        }
+      }
+    }
+
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (uniqueIds.length === 0) {
+      if (detailed.length > 0) {
+        faqCacheRef.current[locale] = detailed;
+        return detailed;
+      }
+    }
+
+    try {
+      const loaded = await Promise.all(
+        uniqueIds.map(async (id) => {
+          try {
+            const response = await fetch(`/api/faqs/${id}?locale=${locale}&depth=0`);
+            if (!response.ok) {
+              return null;
+            }
+            const data = await response.json();
+            if (!data) {
+              return null;
+            }
+            return {
+              question: typeof data.question === 'string' ? data.question : '',
+              answer: data.answer ?? null,
+            };
+          } catch (error) {
+            console.error('[SeoKeywordManager] FAQ fetch failed:', error);
+            return null;
+          }
+        })
+      );
+
+      for (const item of loaded) {
+        if (item) {
+          detailed.push(item);
+        }
+      }
+    } catch (error) {
+      console.error('[SeoKeywordManager] FAQ batch fetch failed:', error);
+    }
+
+    if (detailed.length > 0) {
+      faqCacheRef.current[locale] = detailed;
+      return detailed;
+    }
+
+    if (docInfo?.id) {
+      try {
+        const response = await fetch(`/api/posts-new/${docInfo.id}?locale=${locale}&depth=2`);
+        if (response.ok) {
+          const data = await response.json();
+          const rawFaqs = Array.isArray(data?.faqs) ? (data.faqs as InlineFaqEntry[]) : [];
+          const fromPost = rawFaqs
+            .map((faq) => {
+              const question = typeof faq?.question === 'string' ? faq.question : '';
+              const answer = faq?.answer ?? null;
+              if (!question && !answer) return null;
+              return { question, answer };
+            })
+            .filter(Boolean);
+          if (fromPost.length > 0) {
+            faqCacheRef.current[locale] = fromPost as unknown[];
+            return fromPost as unknown[];
+          }
+        }
+      } catch (error) {
+        console.error('[SeoKeywordManager] FAQ post fallback error:', error);
+      }
+    }
+
+    return null;
+  }, [docInfo?.id]);
+
+  useEffect(() => {
+    const base = baseContext ?? null;
+    if (!contextSignature) {
+      setEffectiveContext(base);
+      lastContextSignatureRef.current = contextSignature ?? null;
+      return;
+    }
+
+    if (lastContextSignatureRef.current === contextSignature) {
+      return;
+    }
+
+    let active = true;
+
+    const enhance = async () => {
+      if (base && base.faqText && base.faqText.trim().length > 0) {
+        if (!active) return;
+        setEffectiveContext(base);
+        lastContextSignatureRef.current = contextSignature;
+        return;
+      }
+
+      const locale = resolveLocale();
+      const resolved = await resolveFaqDetails(stableContextParams?.faqs, locale);
+      if (!active) return;
+
+      if (resolved && resolved.length > 0 && stableContextParams) {
+        const enhanced = buildSeoContentContext({
+          ...stableContextParams,
+          faqs: resolved,
+        });
+        setEffectiveContext(enhanced);
+      } else {
+        setEffectiveContext(base);
+      }
+
+      lastContextSignatureRef.current = contextSignature;
+    };
+
+    void enhance();
+
+    return () => {
+      active = false;
+    };
+  }, [baseContext, contextSignature, resolveFaqDetails, stableContextParams, resolveLocale]);
+
+  const context = effectiveContext ?? baseContext;
 
   // Загрузка сохраненных данных из БД
   useEffect(() => {
@@ -86,9 +284,8 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
 
       try {
         // Получаем текущую локаль из URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const currentLocale = urlParams.get('locale') || 'uk';
-        
+        const currentLocale = resolveLocale();
+
         const response = await fetch(
           `/api/seo-stats?entity_type=${docInfo.collectionSlug}&entity_id=${docInfo.id}&locale=${currentLocale}`
         );
@@ -109,7 +306,7 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
     };
 
     loadData();
-  }, [docInfo?.id, docInfo?.collectionSlug, stringValue]);
+  }, [docInfo?.id, docInfo?.collectionSlug, resolveLocale, stringValue]);
 
   const saveToDatabase = useCallback(
     async (value: AdditionalFieldsValue) => {
@@ -117,9 +314,8 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
 
       try {
         // Получаем текущую локаль из URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const currentLocale = urlParams.get('locale') || 'uk';
-        
+        const currentLocale = resolveLocale();
+
         const response = await fetch('/api/seo-stats', {
           method: 'POST',
           headers: {
@@ -143,7 +339,7 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
         console.error('[SeoKeywordManager] Save error:', error);
       }
     },
-    [docInfo]
+    [docInfo, resolveLocale]
   );
 
   const commitToForm = useCallback(
@@ -224,9 +420,8 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
 
       // Подсчитываем ссылки для нового ключа
       if (docInfo?.id && docInfo?.collectionSlug) {
-        const urlParams = new URLSearchParams(window.location.search);
-        const currentLocale = urlParams.get('locale') || 'uk';
-        
+        const currentLocale = resolveLocale();
+
         const linksResponse = await fetch('/api/seo-stats/calculate-links', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -269,7 +464,7 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [newKeyword, localValue, focusKeyphrase, context, docInfo, slug, commitToForm, saveToDatabase]);
+  }, [newKeyword, localValue, focusKeyphrase, context, docInfo, slug, commitToForm, saveToDatabase, resolveLocale]);
 
   const handleRemove = useCallback(
     (index: number) => {
@@ -331,9 +526,8 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
       const anchors = value.keywords.map(k => k.keyword).filter(Boolean);
       
       // Получаем locale из URL
-      const urlParams = new URLSearchParams(window.location.search);
-      const currentLocale = urlParams.get('locale') || 'uk';
-      
+      const currentLocale = resolveLocale();
+
       const linksResponse = await fetch('/api/seo-stats/calculate-links', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -381,7 +575,7 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [context, localValue, commitToForm, saveToDatabase, docInfo, focusKeyphrase, slug]);
+  }, [context, localValue, commitToForm, saveToDatabase, docInfo, focusKeyphrase, slug, resolveLocale]);
 
   const keywordRows = useMemo(() => {
     return localValue.keywords.map((entry, index) => {

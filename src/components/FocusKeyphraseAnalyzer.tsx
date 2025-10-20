@@ -1,15 +1,41 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UIFieldClientComponent } from 'payload';
 import { Button, useDocumentInfo, useFormFields } from '@payloadcms/ui';
 
 import {
   buildSeoContentContext,
+  createContentSignature,
   deriveSeoFieldCandidates,
   resolveFieldValue,
   type FormFieldState,
+  type SeoContentContext,
 } from '../utils/seoAnalysis';
+
+const contextsSimilar = (a: SeoContentContext | null, b: SeoContentContext | null): boolean => {
+  if (a === b) return true;
+  if (!a || !b) return a === b;
+  return (
+    a.name === b.name &&
+    a.seoTitle === b.seoTitle &&
+    a.metaDescription === b.metaDescription &&
+    a.summary === b.summary &&
+    a.contentText === b.contentText &&
+    a.faqText === b.faqText
+  );
+};
+
+type InlineFaqEntry = {
+  id?: string;
+  question?: string;
+  answer?: unknown;
+  value?: {
+    id?: string;
+    question?: string;
+    answer?: unknown;
+  };
+};
 
 type FocusKeyphraseStats = {
   inName: boolean;
@@ -69,6 +95,10 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
   const [linkDetails, setLinkDetails] = useState<LinkDetails | null>(null);
   const [showInternalDetails, setShowInternalDetails] = useState(false);
   const [showPotentialDetails, setShowPotentialDetails] = useState(false);
+  const [effectiveContext, setEffectiveContext] = useState<SeoContentContext | null>(null);
+  const statsRef = useRef<FocusKeyphraseStats>(EMPTY_STATS);
+  const lastEnhancedSignatureRef = useRef<string | null>(null);
+  const faqCacheRef = useRef<Record<string, unknown[]>>({});
 
   const formState = useFormFields(([rawFields, dispatch]) => {
     const fields = (rawFields ?? {}) as Record<string, FormFieldState | undefined>;
@@ -108,7 +138,7 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
     const rawAdditional = getLocalizedValue(candidates.additionalFields);
     const slug = getLocalizedValue(['slug']);
 
-    const context = buildSeoContentContext({
+    const contextParams = {
       name: (name as string) ?? '',
       seoTitle: (seoTitle as string) ?? '',
       metaDescription: (metaDescription as string) ?? '',
@@ -116,19 +146,215 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
       content,
       faqs,
       additionalFields: rawAdditional,
-    });
+    };
+
+    const contextSignature = createContentSignature([
+      contextParams.name,
+      contextParams.seoTitle,
+      contextParams.metaDescription,
+      contextParams.summary,
+      contextParams.content ?? null,
+      contextParams.faqs ?? null,
+      contextParams.additionalFields ?? null,
+    ]);
 
     return {
       focusKeyphrase: (focusKeyphrase as string) ?? '',
       statsField,
-      context,
+      contextParams,
+      contextSignature,
       slug: (slug as string) ?? '',
       currentLocale,
       dispatch: typeof dispatch === 'function' ? dispatch : null,
     };
   });
 
-  const { focusKeyphrase, statsField, context, slug, currentLocale, dispatch } = formState;
+  const { focusKeyphrase, statsField, contextParams, contextSignature, slug, currentLocale, dispatch } = formState;
+
+  const stableContextParams = useMemo(() => contextParams, [contextSignature]);
+
+  const baseContext = useMemo<SeoContentContext | null>(() => {
+    if (!stableContextParams) return null;
+    return buildSeoContentContext(stableContextParams);
+  }, [contextSignature, stableContextParams]);
+
+  useEffect(() => {
+    statsRef.current = stats;
+  }, [stats]);
+
+  const applyEffectiveContext = useCallback((next: SeoContentContext | null) => {
+    setEffectiveContext((prev) => {
+      if (contextsSimilar(prev, next)) {
+        return prev;
+      }
+      return next;
+    });
+  }, []);
+
+  const resolveFaqDetails = useCallback(async (rawFaqs: unknown, locale: string): Promise<unknown[] | null> => {
+    if (faqCacheRef.current[locale]) {
+      return faqCacheRef.current[locale] ?? null;
+    }
+
+    const entries: InlineFaqEntry[] = Array.isArray(rawFaqs)
+      ? (rawFaqs as InlineFaqEntry[])
+      : rawFaqs
+      ? [rawFaqs as InlineFaqEntry]
+      : [];
+    const detailed: unknown[] = [];
+    const ids: string[] = [];
+
+    for (const entry of entries) {
+      if (!entry) continue;
+      if (typeof entry === 'string') {
+        ids.push(entry);
+        continue;
+      }
+      if (typeof entry === 'object') {
+        const candidate = entry.value && typeof entry.value === 'object' ? entry.value : entry;
+        const question = candidate?.question;
+        const answer = candidate?.answer;
+        const hasQuestion = typeof question === 'string' && question.trim().length > 0;
+        const hasAnswer = Boolean(answer);
+        if (hasQuestion || hasAnswer) {
+          detailed.push({
+            question: typeof question === 'string' ? question : '',
+            answer,
+          });
+          continue;
+        }
+        const idCandidate = entry.id || (typeof (candidate as { id?: string })?.id === 'string' ? (candidate as { id: string }).id : null);
+        if (idCandidate) {
+          ids.push(idCandidate);
+        }
+      }
+    }
+
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (uniqueIds.length === 0) {
+      console.log('[FocusKeyphraseAnalyzer] resolveFaqDetails: inline entries', detailed.length);
+      if (detailed.length > 0) {
+        faqCacheRef.current[locale] = detailed;
+        return detailed;
+      }
+    }
+
+    try {
+      const loaded = await Promise.all(
+        uniqueIds.map(async (id) => {
+          try {
+            const response = await fetch(`/api/faqs/${id}?locale=${locale}&depth=0`);
+            if (!response.ok) {
+              return null;
+            }
+            const data = await response.json();
+            if (!data) {
+              return null;
+            }
+            console.log('[FocusKeyphraseAnalyzer] resolveFaqDetails fetched', id, data);
+            return {
+              question: typeof data.question === 'string' ? data.question : '',
+              answer: data.answer ?? null,
+            };
+          } catch (error) {
+            console.error('[FocusKeyphraseAnalyzer] FAQ fetch failed:', error);
+            return null;
+          }
+        })
+      );
+
+      for (const item of loaded) {
+        if (item) {
+          detailed.push(item);
+        }
+      }
+    } catch (error) {
+      console.error('[FocusKeyphraseAnalyzer] FAQ batch fetch failed:', error);
+    }
+
+    console.log('[FocusKeyphraseAnalyzer] resolveFaqDetails result length', detailed.length);
+    if (detailed.length > 0) {
+      faqCacheRef.current[locale] = detailed;
+      return detailed;
+    }
+
+    if (docInfo?.id) {
+      try {
+        const response = await fetch(`/api/posts-new/${docInfo.id}?locale=${locale}&depth=2`);
+        if (response.ok) {
+          const data = await response.json();
+          const fromPost = Array.isArray(data?.faqs)
+            ? data.faqs
+                .map((faq: Record<string, unknown>) => {
+                  const question = typeof faq?.question === 'string' ? faq.question : '';
+                  const answer = faq?.answer ?? null;
+                  if (!question && !answer) return null;
+                  return { question, answer };
+                })
+                .filter(Boolean)
+            : [];
+          console.log('[FocusKeyphraseAnalyzer] resolveFaqDetails post fallback', fromPost.length);
+          if (fromPost.length > 0) {
+            faqCacheRef.current[locale] = fromPost as unknown[];
+            return fromPost as unknown[];
+          }
+        } else {
+          console.warn('[FocusKeyphraseAnalyzer] resolveFaqDetails post fallback failed with status', response.status);
+        }
+      } catch (error) {
+        console.error('[FocusKeyphraseAnalyzer] resolveFaqDetails post fallback error:', error);
+      }
+    }
+
+    return null;
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const enhanceContext = async () => {
+      const signature = contextSignature ?? null;
+      const base = baseContext ?? null;
+
+      if (lastEnhancedSignatureRef.current === signature) {
+        return;
+      }
+
+      if (!signature) {
+        applyEffectiveContext(base);
+        lastEnhancedSignatureRef.current = signature;
+        return;
+      }
+
+      if (base && base.faqText && base.faqText.trim().length > 0) {
+        applyEffectiveContext(baseContext);
+        lastEnhancedSignatureRef.current = signature;
+        return;
+      }
+
+      const locale = currentLocale ?? 'uk';
+      const resolvedFaqs = await resolveFaqDetails(stableContextParams?.faqs, locale);
+      if (!active) return;
+
+      if (resolvedFaqs && resolvedFaqs.length > 0) {
+        const enhanced = buildSeoContentContext({
+          ...stableContextParams,
+          faqs: resolvedFaqs,
+        });
+        applyEffectiveContext(enhanced);
+      } else {
+        applyEffectiveContext(base);
+      }
+
+      lastEnhancedSignatureRef.current = signature;
+    };
+
+    void enhanceContext();
+
+    return () => {
+      active = false;
+    };
+  }, [baseContext, contextSignature, currentLocale, resolveFaqDetails, applyEffectiveContext, stableContextParams, effectiveContext]);
 
   // Загружаем stats из БД (только один раз при монтировании)
   useEffect(() => {
@@ -168,43 +394,116 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
 
   // Пересчет метрик (возвращает новые stats)
   const handleRecalculate = useCallback(async (currentStats: FocusKeyphraseStats): Promise<FocusKeyphraseStats> => {
-    if (!focusKeyphrase || !context) return currentStats;
+    let contextForCalc = effectiveContext ?? baseContext;
+    if (!focusKeyphrase || !contextForCalc) return currentStats;
 
-    const { enrichKeywordEntries } = await import('../utils/seoAnalysis');
-    
-    const result = enrichKeywordEntries({
-      keywords: [{ keyword: focusKeyphrase, notes: '' }],
-      context,
-      previous: { keywords: [] },
+    if ((contextForCalc.faqText ?? '').trim().length === 0 && stableContextParams?.faqs) {
+      const locale = currentLocale ?? 'uk';
+      const resolvedFaqs = await resolveFaqDetails(stableContextParams.faqs, locale);
+      if (resolvedFaqs && resolvedFaqs.length > 0) {
+        const enhanced = buildSeoContentContext({
+          ...stableContextParams,
+          faqs: resolvedFaqs,
+        });
+        applyEffectiveContext(enhanced);
+        contextForCalc = enhanced;
+      }
+    }
+
+    const { computeFocusKeyphraseStats } = await import('../utils/seoAnalysis');
+
+    const baseStats = computeFocusKeyphraseStats({
+      focusKeyphrase,
+      context: contextForCalc,
+      previous: {
+        inName: currentStats.inName,
+        inSeoTitle: currentStats.inSeoTitle,
+        inMetaDescription: currentStats.inMetaDescription,
+        inSummary: currentStats.inSummary,
+        inContent: currentStats.inContent,
+        contentPercentage: currentStats.contentPercentage,
+        inHeadings: currentStats.inHeadings,
+        inFaq: currentStats.inFaq,
+        anchorLinksCount: 0,
+        contentSignature: currentStats.contentSignature,
+        updatedAt: currentStats.updatedAt,
+      },
     });
 
-    const kw = result.value.keywords[0];
-    if (!kw) return currentStats;
+    console.log('[FocusKeyphraseAnalyzer] FAQ text sample:', (contextForCalc.faqText ?? '').slice(0, 200));
+    console.log('[FocusKeyphraseAnalyzer] FAQ occurrences:', baseStats.inFaq);
 
-    const totalCount = kw.cachedTotal ?? 0;
-    const totalWords = context.contentText ? context.contentText.split(/\s+/).length : 1;
+    const { anchorLinksCount, ...rest } = baseStats;
+    void anchorLinksCount;
 
     const newStats: FocusKeyphraseStats = {
-      inName: context.name.toLowerCase().includes(focusKeyphrase.toLowerCase()),
-      inSeoTitle: context.seoTitle.toLowerCase().includes(focusKeyphrase.toLowerCase()),
-      inMetaDescription: context.metaDescription.toLowerCase().split(focusKeyphrase.toLowerCase()).length - 1,
-      inSummary: context.summary.toLowerCase().split(focusKeyphrase.toLowerCase()).length - 1,
-      inContent: totalCount,
-      contentPercentage: totalCount > 0 && totalWords > 0 ? (totalCount / totalWords) * 100 : 0,
-      inHeadings: kw.cachedHeadings ?? 0,
-      inFaq: 0,
+      ...EMPTY_STATS,
+      ...rest,
       internalLinks: currentStats.internalLinks,
       potentialLinks: currentStats.potentialLinks,
-      contentSignature: null,
-      updatedAt: new Date().toISOString(),
     };
 
     return newStats;
-  }, [focusKeyphrase, context]);
+  }, [focusKeyphrase, baseContext, effectiveContext, currentLocale, resolveFaqDetails, stableContextParams, applyEffectiveContext]);
+
+  const lastAutoCalcSignatureRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!focusKeyphrase) {
+      lastAutoCalcSignatureRef.current = null;
+      return;
+    }
+
+    const contextForCalc = effectiveContext ?? baseContext;
+    if (!contextForCalc) return;
+
+    const signature = createContentSignature([
+      focusKeyphrase,
+      contextForCalc.name,
+      contextForCalc.seoTitle,
+      contextForCalc.metaDescription,
+      contextForCalc.summary,
+      contextForCalc.contentText,
+      contextForCalc.faqText,
+    ]);
+
+    if (lastAutoCalcSignatureRef.current === signature) return;
+
+    lastAutoCalcSignatureRef.current = signature;
+
+    void (async () => {
+      try {
+        const updated = await handleRecalculate(statsRef.current);
+        const hasChanged =
+          updated.inName !== statsRef.current.inName ||
+          updated.inSeoTitle !== statsRef.current.inSeoTitle ||
+          updated.inMetaDescription !== statsRef.current.inMetaDescription ||
+          updated.inSummary !== statsRef.current.inSummary ||
+          updated.inContent !== statsRef.current.inContent ||
+          Number(updated.contentPercentage.toFixed(2)) !== Number(statsRef.current.contentPercentage.toFixed(2)) ||
+          updated.inHeadings !== statsRef.current.inHeadings ||
+          updated.inFaq !== statsRef.current.inFaq;
+
+        if (!hasChanged) {
+          return;
+        }
+
+        setStats(updated);
+        statsRef.current = updated;
+
+        if (dispatch) {
+          dispatch({ type: 'UPDATE', path, value: updated });
+        }
+      } catch (error) {
+        console.error('[FocusKeyphraseAnalyzer] Auto recalculation failed:', error);
+      }
+    })();
+  }, [focusKeyphrase, baseContext, effectiveContext, handleRecalculate, dispatch, path]);
 
   // Полный пересчет: метрики + ссылки
   const handleFullRecalculate = useCallback(async () => {
-    if (!focusKeyphrase || !context) {
+    const contextForCalc = effectiveContext ?? baseContext;
+    if (!focusKeyphrase || !contextForCalc) {
       alert('Focus Keyphrase не заполнена');
       return;
     }
@@ -297,7 +596,7 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
     } finally {
       setIsCalculatingLinks(false);
     }
-  }, [focusKeyphrase, context, docInfo, handleRecalculate, stats, slug, currentLocale, dispatch, path]);
+  }, [focusKeyphrase, baseContext, effectiveContext, docInfo, handleRecalculate, stats, slug, currentLocale, dispatch, path]);
 
   if (!focusKeyphrase) {
     return (

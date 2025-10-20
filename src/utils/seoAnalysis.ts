@@ -122,6 +122,8 @@ export type SeoContentContext = {
   headingsText: string[];
   headingsTokens: NormalizedToken[][];
   faqText: string;
+  faqQuestionTokens: NormalizedToken[][];
+  faqAnswerTokens: NormalizedToken[][];
   additionalFields?: AdditionalFieldsValue | null;
 };
 
@@ -392,7 +394,7 @@ export function tokenizeForSeo(raw: string): NormalizedToken[] {
 }
 
 export function countKeywordOccurrences(keyword: string, tokens: NormalizedToken[]): number {
-  const keywordTokens = tokenizeForSeo(keyword).filter((token) => !STOP_WORDS.has(token.value));
+  const keywordTokens = tokenizeForSeo(keyword).filter((token) => !token.isStopWord);
   if (!keywordTokens.length || !tokens.length) return 0;
   let count = 0;
   for (let i = 0; i < tokens.length; i++) {
@@ -478,20 +480,116 @@ export function extractTextFromLexical(value: unknown): { text: string; headings
   return { text: '', headings: [] };
 }
 
+type FaqLikeRecord = Record<string, unknown> & {
+  question?: unknown;
+  answer?: unknown;
+  value?: Record<string, unknown> & { question?: unknown; answer?: unknown };
+};
+
+function normalizeFaqEntries(value: unknown): FaqLikeRecord[] {
+  if (!value) return [];
+
+  const normalizeSingle = (entry: unknown): FaqLikeRecord | null => {
+    if (!entry || typeof entry !== 'object') return null;
+    const record = entry as Record<string, unknown>;
+
+    // Payload relationship drafts могут содержать relationTo + value
+    if (Array.isArray(record.relationTo) && record.value && typeof record.value === 'object') {
+      return record.value as FaqLikeRecord;
+    }
+
+    return record as FaqLikeRecord;
+  };
+
+  if (Array.isArray(value)) {
+    const result: FaqLikeRecord[] = [];
+    for (const item of value) {
+      const normalized = normalizeSingle(item);
+      if (normalized) {
+        result.push(normalized);
+      }
+    }
+    return result;
+  }
+
+  const single = normalizeSingle(value);
+  return single ? [single] : [];
+}
+
 export function extractFaqText(value: unknown): string {
-  if (!value) return '';
   const chunks: string[] = [];
-  const source = Array.isArray(value) ? value : [value];
-  for (const item of source) {
-    if (!item || typeof item !== 'object') continue;
-    const record = item as Record<string, unknown>;
-    const data = (record.value && typeof record.value === 'object') ? (record.value as Record<string, unknown>) : record;
-    const question = typeof data.question === 'string' ? data.question : '';
-    const answer = typeof data.answer === 'string' ? data.answer : '';
+  const source = normalizeFaqEntries(value);
+
+  const extractStringOrLexical = (input: unknown): string => {
+    if (!input) return '';
+    if (typeof input === 'string') {
+      return input;
+    }
+    if (typeof input === 'object') {
+      const record = input as Record<string, unknown>;
+      if (typeof record.value === 'string') {
+        return record.value;
+      }
+      if (record.root && typeof record.root === 'object') {
+        return extractTextFromLexical(record).text;
+      }
+    }
+    return '';
+  };
+
+  for (const record of source) {
+    const data = record.value && typeof record.value === 'object' ? (record.value as Record<string, unknown>) : record;
+
+    const question = extractStringOrLexical(data.question ?? record.question);
+    const answer = extractStringOrLexical(data.answer ?? record.answer);
+
     if (question) chunks.push(question);
     if (answer) chunks.push(answer);
   }
+
   return chunks.join(' ');
+}
+
+export function extractFaqTokens(value: unknown): {
+  questionTokens: NormalizedToken[][];
+  answerTokens: NormalizedToken[][];
+} {
+  const questionTokens: NormalizedToken[][] = [];
+  const answerTokens: NormalizedToken[][] = [];
+  const source = normalizeFaqEntries(value);
+
+  const extractStringOrLexical = (input: unknown): string => {
+    if (!input) return '';
+    if (typeof input === 'string') {
+      return input;
+    }
+    if (typeof input === 'object') {
+      const record = input as Record<string, unknown>;
+      if (typeof record.value === 'string') {
+        return record.value;
+      }
+      if (record.root && typeof record.root === 'object') {
+        return extractTextFromLexical(record).text;
+      }
+    }
+    return '';
+  };
+
+  for (const record of source) {
+    const data = record.value && typeof record.value === 'object' ? (record.value as Record<string, unknown>) : record;
+
+    const question = extractStringOrLexical(data.question ?? record.question);
+    const answer = extractStringOrLexical(data.answer ?? record.answer);
+
+    if (question) {
+      questionTokens.push(tokenizeForSeo(question));
+    }
+    if (answer) {
+      answerTokens.push(tokenizeForSeo(answer));
+    }
+  }
+
+  return { questionTokens, answerTokens };
 }
 
 export function createContentSignature(chunks: unknown[]): string {
@@ -542,6 +640,7 @@ export function buildSeoContentContext(params: {
 }): SeoContentContext {
   const { text: contentText, headings } = extractTextFromLexical(params.content);
   const faqText = extractFaqText(params.faqs);
+  const { questionTokens: faqQuestionTokens, answerTokens: faqAnswerTokens } = extractFaqTokens(params.faqs);
   return {
     name: params.name ?? '',
     seoTitle: params.seoTitle ?? '',
@@ -552,19 +651,17 @@ export function buildSeoContentContext(params: {
     headingsText: headings,
     headingsTokens: headings.map((heading) => tokenizeForSeo(heading)),
     faqText,
+    faqQuestionTokens,
+    faqAnswerTokens,
     additionalFields: parseAdditionalFields(params.additionalFields),
   };
 }
 
 function containsKeyword(keyword: string, target: string): boolean {
   if (!keyword || !target) return false;
-  const normalizedKeyword = tokenizeForSeo(keyword)
-    .filter((token) => !token.isStopWord)
-    .map((token) => token.value)
-    .join(' ');
-  if (!normalizedKeyword) return false;
-  const normalizedTarget = tokenizeForSeo(target).map((token) => token.value).join(' ');
-  return normalizedTarget.includes(normalizedKeyword);
+  const targetTokens = tokenizeForSeo(target);
+  if (!targetTokens.length) return false;
+  return countKeywordOccurrences(keyword, targetTokens) > 0;
 }
 
 function statsEqual(a: FocusKeyphraseStats | null | undefined, b: FocusKeyphraseStats): boolean {
@@ -664,8 +761,16 @@ export function enrichKeywordEntries(params: {
 
   const enriched = keywords.map((entry) => {
     const keyword = entry.keyword ?? '';
-    const total = countKeywordOccurrences(keyword, context.contentTokens);
+    const totalInContent = countKeywordOccurrences(keyword, context.contentTokens);
+    const totalInFaqAnswers = context.faqAnswerTokens.reduce(
+      (acc, tokens) => acc + countKeywordOccurrences(keyword, tokens),
+      0,
+    );
+    const total = totalInContent + totalInFaqAnswers;
     const headingsCount = context.headingsTokens.reduce(
+      (acc, tokens) => acc + countKeywordOccurrences(keyword, tokens),
+      0,
+    ) + context.faqQuestionTokens.reduce(
       (acc, tokens) => acc + countKeywordOccurrences(keyword, tokens),
       0,
     );
