@@ -14,8 +14,13 @@ const __dirname = path.dirname(__filename);
 const { Pool } = pg;
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URI || 'postgresql://navi_user:4cS2MgeUp9TDJS74ixGjOsfK0SY9xw3HUq0LsjRrsYE=@91.98.39.139:32769/postgres?search_path=navi'
+  connectionString: process.env.DATABASE_URI
 });
+
+if (!process.env.DATABASE_URI) {
+  console.error('❌ Ошибка: DATABASE_URI не найден в .env файле');
+  process.exit(1);
+}
 
 async function runMigration() {
   const client = await pool.connect();

@@ -28,6 +28,7 @@ export default buildConfig({
       autoGenerate: false,
     },
   },
+  defaultDepth: 1,
   collections: [Users, Media, Redirects, Posts, Tags, Team, Certificates, Trainings],
   globals: [SiteGlobals],
   editor: lexicalEditor(),

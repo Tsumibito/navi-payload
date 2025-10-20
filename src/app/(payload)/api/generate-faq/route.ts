@@ -146,7 +146,7 @@ function prepareContext(params: {
     if (parsed.root) {
       contentText = extractTextFromLexical(parsed);
     }
-  } catch (e) {
+  } catch {
     // Не JSON, используем как есть
   }
 
@@ -171,18 +171,20 @@ function prepareContext(params: {
 /**
  * Извлекаем текст из Lexical JSON
  */
-function extractTextFromLexical(lexicalData: any): string {
+function extractTextFromLexical(lexicalData: { root?: unknown }): string {
   const texts: string[] = [];
   
-  function traverse(node: any) {
-    if (!node) return;
+  function traverse(node: unknown): void {
+    if (!node || typeof node !== 'object') return;
     
-    if (node.text) {
-      texts.push(node.text);
+    const nodeObj = node as Record<string, unknown>;
+    
+    if (typeof nodeObj.text === 'string') {
+      texts.push(nodeObj.text);
     }
     
-    if (Array.isArray(node.children)) {
-      for (const child of node.children) {
+    if (Array.isArray(nodeObj.children)) {
+      for (const child of nodeObj.children) {
         traverse(child);
       }
     }
@@ -219,13 +221,21 @@ Guidelines:
 - Match the tone and style of the existing content
 - Focus on user intent and common questions readers might have
 
-Output format: JSON array of objects with "question" and "answer" fields.`;
+**IMPORTANT SEO Requirements:**
+- If a Focus Keyphrase is provided, use it EXACTLY ONCE across all FAQ items (in question or answer)
+- If Link Keywords are provided, try to use 1-2 of them in EACH FAQ item naturally
+- Keywords should fit naturally into the text, not feel forced
+
+Output format: ONLY a valid JSON array with no markdown formatting, no comments, no extra text.
+Format: [{"question": "...", "answer": "..."}]
+
+IMPORTANT: Ensure all quotes inside question/answer text are properly escaped with backslash.`;
 }
 
 /**
  * Формируем user message
  */
-function buildUserMessage(context: any, userPrompt: string, count: number): string {
+function buildUserMessage(context: ReturnType<typeof prepareContext>, userPrompt: string, count: number): string {
   let message = `# Blog Post Context\n\n`;
   message += `**Title:** ${context.postTitle}\n\n`;
   
@@ -260,8 +270,17 @@ function buildUserMessage(context: any, userPrompt: string, count: number): stri
   
   message += `## User Request:\n\n${userPrompt}\n\n`;
   message += `Generate ${count} high-quality FAQ items based on the above context.\n\n`;
-  message += `Return ONLY a valid JSON array in this exact format:\n`;
-  message += `[\n  {"question": "...", "answer": "..."},\n  {"question": "...", "answer": "..."}\n]`;
+  
+  if (context.focusKeyphrase) {
+    message += `**SEO REQUIREMENT:** Use the Focus Keyphrase "${context.focusKeyphrase}" EXACTLY ONCE across all FAQ items.\n`;
+  }
+  if (context.linkKeywords.length > 0) {
+    message += `**SEO REQUIREMENT:** Try to naturally include 1-2 of these Link Keywords in EACH FAQ: ${context.linkKeywords.join(', ')}\n`;
+  }
+  message += `\n`;
+  message += `Return ONLY a valid JSON array with NO markdown formatting, NO code blocks, NO extra text.\n`;
+  message += `Format: [{"question": "...", "answer": "..."}]\n`;
+  message += `CRITICAL: Escape all quotes inside text with backslash (\\" not ").`;
   
   return message;
 }
@@ -311,14 +330,24 @@ async function generateFAQsWithOpenRouter(systemPrompt: string, userMessage: str
  * Парсим ответ AI (извлекаем JSON)
  */
 function parseAIResponse(aiResponse: string): FAQItem[] {
+  console.log('[Parse AI] Raw response length:', aiResponse.length);
+  console.log('[Parse AI] First 500 chars:', aiResponse.substring(0, 500));
+  
+  // Убираем markdown code blocks если есть
+  let cleaned = aiResponse.trim();
+  cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '');
+  
   // Ищем JSON массив в ответе
-  const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
+  const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
   
   if (!jsonMatch) {
+    console.error('[Parse AI] No JSON array found in response');
+    console.error('[Parse AI] Full response:', aiResponse);
     throw new Error('No JSON array found in AI response');
   }
 
   try {
+    // Пытаемся распарсить напрямую
     const faqs = JSON.parse(jsonMatch[0]);
     
     if (!Array.isArray(faqs)) {
@@ -328,13 +357,45 @@ function parseAIResponse(aiResponse: string): FAQItem[] {
     // Валидируем структуру
     for (const faq of faqs) {
       if (!faq.question || !faq.answer) {
-        throw new Error('Invalid FAQ structure');
+        throw new Error('Invalid FAQ structure: missing question or answer');
       }
     }
 
+    console.log('[Parse AI] Successfully parsed', faqs.length, 'FAQs');
     return faqs;
-  } catch (error) {
-    console.error('[Parse AI] Error parsing JSON:', error);
-    throw new Error('Failed to parse AI response as JSON');
+  } catch (firstError) {
+    console.error('[Parse AI] First parse attempt failed:', firstError);
+    console.error('[Parse AI] Problematic JSON:', jsonMatch[0].substring(0, 1000));
+    
+    // Попытка 2: Чиним распространенные проблемы
+    try {
+      let fixedJson = jsonMatch[0];
+      
+      // Убираем переносы строк внутри строковых значений (заменяем на пробелы)
+      // Это сложная операция, делаем через замену \n на пробел между кавычками
+      fixedJson = fixedJson.replace(/"([^"]*?)\n([^"]*?)"/g, '"$1 $2"');
+      
+      // Убираем trailing commas
+      fixedJson = fixedJson.replace(/,\s*([}\]])/g, '$1');
+      
+      const faqs = JSON.parse(fixedJson);
+      
+      if (!Array.isArray(faqs)) {
+        throw new Error('Response is not an array');
+      }
+
+      for (const faq of faqs) {
+        if (!faq.question || !faq.answer) {
+          throw new Error('Invalid FAQ structure: missing question or answer');
+        }
+      }
+
+      console.log('[Parse AI] Successfully parsed after fixing', faqs.length, 'FAQs');
+      return faqs;
+    } catch (secondError) {
+      console.error('[Parse AI] Second parse attempt failed:', secondError);
+      console.error('[Parse AI] Full AI response:', aiResponse);
+      throw new Error(`Failed to parse AI response as JSON. First error: ${firstError instanceof Error ? firstError.message : 'Unknown'}`);
+    }
   }
 }

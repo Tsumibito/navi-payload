@@ -20,6 +20,9 @@ export const Posts: CollectionConfig = {
     defaultColumns: ['name', 'slug', 'published_at', 'featured'],
     description: 'Blog posts with native Payload i18n',
     group: 'Content',
+    defaultPopulate: {
+      depth: 1,
+    },
   },
   access: {
     read: () => true,

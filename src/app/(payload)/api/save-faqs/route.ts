@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     
     const { postId, locale, faqs, mode = 'add' } = body;
 
-    if (!postId || !locale || !faqs || faqs.length === 0) {
+    if (!postId || !locale || !faqs || (mode !== 'replace' && faqs.length === 0)) {
       console.error('[Save FAQs] Validation failed:', { postId, locale, faqsCount: faqs?.length });
       return NextResponse.json(
         { error: 'Missing required fields: postId, locale, faqs' },

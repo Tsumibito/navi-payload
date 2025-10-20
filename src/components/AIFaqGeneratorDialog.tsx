@@ -135,6 +135,11 @@ export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ post
       }));
 
       console.log('[Generate FAQ] Existing FAQs:', existingFaqsPlainText.length);
+      console.log('[Generate FAQ] Focus Keyphrase:', postData.seo?.focus_keyphrase);
+      console.log('[Generate FAQ] Link Keywords structure:', postData.seo?.additional_fields);
+      
+      const linkKeywords = postData.seo?.additional_fields?.keywords?.map((k: any) => k.keyword) || [];
+      console.log('[Generate FAQ] Link Keywords:', linkKeywords);
 
       // 3. Генерируем FAQ через AI
       const generateResponse = await fetch('/api/generate-faq', {
@@ -146,7 +151,7 @@ export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ post
           postSummary: postData.summary || '',
           existingFaqs: existingFaqsPlainText,
           focusKeyphrase: postData.seo?.focus_keyphrase || '',
-          linkKeywords: postData.seo?.additional_fields?.keywords?.map((k: any) => k.keyword) || [],
+          linkKeywords: linkKeywords,
           suggestedQuestions,
           userPrompt: prompt,
           count,

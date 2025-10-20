@@ -95,6 +95,7 @@ export const Team: CollectionConfig = {
               label: 'Posts',
               relationTo: [POSTS_RELATION],
               hasMany: true,
+              maxDepth: 0,
               // НЕ локализовано - связи общие
               admin: {
                 description: 'Posts authored by this team member',

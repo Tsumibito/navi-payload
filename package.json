@@ -14,7 +14,8 @@
     "migrate:team-localized": "tsx --env-file=.env scripts/migrate-team-to-localized.ts",
     "migrate:posts-localized": "tsx --env-file=.env scripts/migrate-posts-to-localized.ts",
     "migrate:certificates-localized": "tsx --env-file=.env scripts/migrate-certificates-to-localized.ts",
-    "migrate:seo-fields": "tsx --env-file=.env scripts/run-migration.js"
+    "migrate:seo-fields": "tsx --env-file=.env scripts/run-migration.js",
+    "regenerate:images": "tsx --env-file=.env scripts/regenerate-r2-image-sizes.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.901.0",

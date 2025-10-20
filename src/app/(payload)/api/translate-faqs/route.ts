@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_TOKEN = process.env.OPENROUTER_TOKEN;
+const CYRILLIC_REGEX = /[А-Яа-яЁёІіЇїЄєҐґ]/g;
+
+class TranslationValidationError extends Error {
+  meta?: Record<string, unknown>;
+
+  constructor(message: string, meta?: Record<string, unknown>) {
+    super(message);
+    this.name = 'TranslationValidationError';
+    this.meta = meta;
+  }
+}
 
 type FAQ = {
   id?: string; // ID для синхронизации между локалями
@@ -188,12 +199,14 @@ IMPORTANT: You MUST translate ALL ${faqs.length} FAQs!`;
 
     // ВАЖНО: добавляем ID обратно к переведенным FAQ для синхронизации
     const translatedFaqsWithIds = translatedFaqs.map((translatedFaq: FAQ, index: number) => ({
-      id: faqs[index].id, // Берем ID из исходного FAQ
-      question: translatedFaq.question,
-      answer: translatedFaq.answer,
+      id: faqs[index].id,
+      question: translatedFaq.question?.trim() ?? '',
+      answer: translatedFaq.answer?.trim() ?? '',
     }));
 
     console.log('\n[Translate FAQs] IDs preserved:', translatedFaqsWithIds.map(f => f.id));
+
+    validateTranslatedFaqs({ translatedFaqs: translatedFaqsWithIds, originalFaqs: faqs, toLocale });
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`\n=== [Translate FAQs] SUCCESS in ${duration}s ===\n`);
@@ -205,6 +218,18 @@ IMPORTANT: You MUST translate ALL ${faqs.length} FAQs!`;
 
   } catch (error) {
     console.error('[Translate FAQs] Error:', error);
+
+    if (error instanceof TranslationValidationError) {
+      return NextResponse.json(
+        {
+          error: 'Translation validation failed',
+          details: error.message,
+          meta: error.meta,
+        },
+        { status: 422 },
+      );
+    }
+
     return NextResponse.json(
       { 
         error: 'Translation failed',
@@ -213,4 +238,99 @@ IMPORTANT: You MUST translate ALL ${faqs.length} FAQs!`;
       { status: 500 }
     );
   }
+}
+
+function validateTranslatedFaqs(params: { translatedFaqs: FAQ[]; originalFaqs: FAQ[]; toLocale: string }) {
+  const { translatedFaqs, originalFaqs, toLocale } = params;
+
+  translatedFaqs.forEach((faq, index) => {
+    const original = originalFaqs[index];
+
+    if (!faq.question || !faq.answer) {
+      throw new TranslationValidationError(
+        `FAQ #${index} перевод пустой`,
+        {
+          index,
+          reason: 'empty_text',
+          locale: toLocale,
+          question: faq.question,
+          answer: faq.answer,
+        }
+      );
+    }
+
+    if (original) {
+      if (faq.question.trim() === original.question?.trim()) {
+        throw new TranslationValidationError(
+          `FAQ #${index} вопрос совпадает с оригиналом`,
+          {
+            index,
+            locale: toLocale,
+            reason: 'question_equals_original',
+            originalQuestion: original.question,
+          }
+        );
+      }
+
+      if (faq.answer.trim() === original.answer?.trim()) {
+        throw new TranslationValidationError(
+          `FAQ #${index} ответ совпадает с оригиналом`,
+          {
+            index,
+            locale: toLocale,
+            reason: 'answer_equals_original',
+            originalAnswer: original.answer,
+          }
+        );
+      }
+    }
+
+    const questionPercent = calculateCyrillicPercent(faq.question);
+    const answerPercent = calculateCyrillicPercent(faq.answer);
+
+    if (toLocale === 'en') {
+      if (questionPercent >= 0.1 || answerPercent >= 0.1) {
+        throw new TranslationValidationError(
+          `FAQ #${index} должен быть на английском, но обнаружена кириллица`,
+          {
+            index,
+            locale: toLocale,
+            reason: 'too_much_cyrillic',
+            questionPercent,
+            answerPercent,
+          }
+        );
+      }
+    } else if (toLocale === 'ru' || toLocale === 'uk') {
+      if (questionPercent <= 0.3 || answerPercent <= 0.3) {
+        throw new TranslationValidationError(
+          `FAQ #${index} должен быть на ${toLocale === 'ru' ? 'русском' : 'украинском'}, но найдено слишком мало кириллицы`,
+          {
+            index,
+            locale: toLocale,
+            reason: 'not_enough_cyrillic',
+            questionPercent,
+            answerPercent,
+          }
+        );
+      }
+    }
+
+    console.log(
+      `[Translate FAQs] FAQ #${index} validated: Q=${(questionPercent * 100).toFixed(1)}% Cyrillic, A=${(answerPercent * 100).toFixed(1)}% Cyrillic ✅`
+    );
+  });
+}
+
+function calculateCyrillicPercent(text: string): number {
+  if (!text) {
+    return 0;
+  }
+
+  const matches = text.match(CYRILLIC_REGEX);
+  if (!matches || text.length === 0) {
+    return 0;
+  }
+
+  return matches.length / text.length;
 }
