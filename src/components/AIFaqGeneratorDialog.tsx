@@ -1,17 +1,78 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Button } from '@payloadcms/ui';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Button, useDocumentInfo } from '@payloadcms/ui';
 
 type FAQItem = {
+  id?: string;
   question: string;
   answer: string;
   accepted?: boolean;
 };
 
+type SupportedCollection = 'posts-new' | 'tags-new';
+
 type AIFaqGeneratorDialogProps = {
   postId: string;
+  collectionSlug?: SupportedCollection;
   onClose: () => void;
+};
+
+const DEFAULT_PROMPTS: Record<string, string> = {
+  ru: 'Создай полезные и понятные новичку в яхтинге FAQ по теме статьи, которые будут реально полезны пользователям и имеют потенциал чтобы попасть в Google подсказки. Умеренно используй в тексте вопросов и ответов ключевые слова поста. Тон дружественно экспертный. Избегай упоминания России, ГИМС и ВФПС, а также компании Интерпарус.',
+  uk: 'Створи корисні та зрозумілі новачку в яхтингу FAQ на тему статті, які будуть реально корисні користувачам і мають потенціал потрапити в підказки Google. Помірно використовуй у тексті запитань і відповідей ключові слова поста. Тон дружній та експертний. Уникай згадок про Росію, ГІМС і ВФПС, а також компанію Інтерпарус.',
+  en: "Create helpful FAQ about the article's topic that are easy to understand for a beginner in yachting, genuinely useful for users, and have the potential to appear in Google suggestions. Use the post's keywords in the questions and answers sparingly. Keep the tone friendly and expert. Avoid mentioning Russia, GIMS, VFPS, and the company Interparus.",
+};
+
+const normalizeLocale = (value?: string | null): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  const lower = value.toLowerCase();
+
+  if (lower.startsWith('ru')) {
+    return 'ru';
+  }
+
+  if (lower.startsWith('uk') || lower.startsWith('ua')) {
+    return 'uk';
+  }
+
+  if (lower.startsWith('en')) {
+    return 'en';
+  }
+
+  return lower;
+};
+
+const extractLocaleFromDocInfo = (info: ReturnType<typeof useDocumentInfo>): string | null => {
+  if (!info || typeof info !== 'object') {
+    return null;
+  }
+
+  const maybeLocale = (info as { locale?: unknown }).locale;
+
+  if (typeof maybeLocale === 'string') {
+    return maybeLocale;
+  }
+
+  if (maybeLocale && typeof maybeLocale === 'object') {
+    const localeObj = maybeLocale as { code?: unknown; locale?: unknown };
+    if (typeof localeObj.code === 'string') {
+      return localeObj.code;
+    }
+    if (typeof localeObj.locale === 'string') {
+      return localeObj.locale;
+    }
+  }
+
+  const maybeLocaleCode = (info as { localeCode?: unknown }).localeCode;
+  if (typeof maybeLocaleCode === 'string') {
+    return maybeLocaleCode;
+  }
+
+  return null;
 };
 
 /**
@@ -20,27 +81,91 @@ type AIFaqGeneratorDialogProps = {
 /**
  * Конвертация Lexical JSON в plain text
  */
-const lexicalToPlainText = (lexicalJson: any): string => {
-  if (!lexicalJson || !lexicalJson.root) return '';
-  
-  const extractText = (node: any): string => {
-    if (!node) return '';
-    
-    // Если это текстовый узел
-    if (node.text) return node.text;
-    
-    // Если есть дети, рекурсивно извлекаем текст
-    if (node.children && Array.isArray(node.children)) {
-      return node.children.map(extractText).join(' ');
-    }
-    
+type LexicalNode = {
+  text?: string;
+  children?: LexicalNode[];
+};
+
+type LexicalJSON = {
+  root?: LexicalNode;
+};
+
+const lexicalToPlainText = (lexicalJson?: LexicalJSON | null): string => {
+  if (!lexicalJson?.root) {
     return '';
+  }
+
+  const extractText = (node?: LexicalNode | null): string => {
+    if (!node) {
+      return '';
+    }
+
+    const parts: string[] = [];
+
+    if (node.text) {
+      parts.push(node.text);
+    }
+
+    if (node.children && node.children.length > 0) {
+      parts.push(node.children.map(extractText).filter(Boolean).join(' '));
+    }
+
+    return parts.filter(Boolean).join(' ');
   };
-  
+
   return extractText(lexicalJson.root).trim();
 };
 
-export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ postId, onClose }) => {
+const hasLexicalContent = (answer?: LexicalJSON | null): boolean => {
+  const children = answer?.root?.children;
+  return Array.isArray(children) && children.length > 0;
+};
+
+type PostFaq = {
+  id?: string;
+  question?: string | null;
+  answer?: LexicalJSON | null;
+};
+
+type CommonSeo = {
+  focus_keyphrase?: string | null;
+  additional_fields?: {
+    keywords?: Array<{ keyword?: string | null }> | null;
+  } | null;
+};
+
+type CommonEntity = {
+  id?: string;
+  name?: string | null;
+  summary?: string | null;
+  content?: unknown;
+  faqs?: PostFaq[] | null;
+  seo?: CommonSeo | null;
+};
+
+type PostData = CommonEntity & {
+  seo?: (CommonSeo & {
+    additional_fields?: {
+      keywords?: Array<{ keyword?: string | null }> | null;
+    } | null;
+  }) | null;
+};
+
+type TagData = CommonEntity & {
+  descriptionForAI?: string | null;
+};
+
+type CollectionData = PostData | TagData;
+
+const isTagEntity = (entity: CollectionData): entity is TagData =>
+  Object.prototype.hasOwnProperty.call(entity, 'descriptionForAI');
+
+type CollectionContext = {
+  collection: SupportedCollection;
+  id: string;
+};
+
+export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ postId, collectionSlug = 'posts-new', onClose }) => {
   type StepType = 'prompt' | 'generating' | 'preview' | 'saving';
   type SavingProgress = {
     step: string;
@@ -49,7 +174,8 @@ export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ post
   };
 
   const [step, setStep] = useState<StepType>('prompt');
-  const [prompt, setPrompt] = useState('Generate FAQ about this article for beginners');
+  const docInfo = useDocumentInfo();
+  const [prompt, setPrompt] = useState(DEFAULT_PROMPTS.ru);
   const [count, setCount] = useState(3);
   const [generatedFaqs, setGeneratedFaqs] = useState<FAQItem[]>([]);
   const [feedback, setFeedback] = useState('');
@@ -58,41 +184,105 @@ export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ post
   const [savingProgress, setSavingProgress] = useState<SavingProgress[]>([]);
 
   // Загрузка контекста поста
-  const [postData, setPostData] = useState<any>(null);
+  const [entityData, setEntityData] = useState<CollectionData | null>(null);
+  const [currentLocale, setCurrentLocale] = useState<string>('ru');
+
+  const resolveLocale = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = normalizeLocale(params.get('locale'));
+      if (fromUrl) {
+        return fromUrl;
+      }
+    }
+
+    const infoLocale = extractLocaleFromDocInfo(docInfo);
+    if (infoLocale) {
+      const normalized = normalizeLocale(infoLocale);
+      if (normalized) {
+        return normalized;
+      }
+    }
+
+    return 'ru';
+  }, [docInfo]);
 
   useEffect(() => {
-    loadPostData();
-  }, [postId]);
+    const locale = resolveLocale();
+    setCurrentLocale(locale);
+  }, [resolveLocale]);
+
+  useEffect(() => {
+    const defaultPrompt = DEFAULT_PROMPTS[currentLocale] || DEFAULT_PROMPTS.ru;
+    setPrompt(defaultPrompt);
+  }, [currentLocale]);
+
+  const resolveCollection = useCallback((): CollectionContext => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const collectionFromUrl = params.get('collection');
+      if (collectionFromUrl === 'posts-new' || collectionFromUrl === 'tags-new') {
+        return { collection: collectionFromUrl, id: postId };
+      }
+
+      const match = window.location.pathname.match(/\/collections\/(posts-new|tags-new)\//);
+      if (match) {
+        return { collection: match[1] as SupportedCollection, id: postId };
+      }
+    }
+
+    if (docInfo && typeof docInfo === 'object') {
+      const maybeCollection = (docInfo as { collection?: unknown }).collection;
+      if (maybeCollection === 'posts-new' || maybeCollection === 'tags-new') {
+        return { collection: maybeCollection, id: postId };
+      }
+    }
+
+    return {
+      collection: collectionSlug,
+      id: postId,
+    };
+  }, [collectionSlug, docInfo, postId]);
+
+  const getFetchPath = useCallback((context: CollectionContext, locale: string) => {
+    const params = new URLSearchParams({ locale, depth: '2', draft: 'true' });
+    return `/api/${context.collection}/${context.id}?${params.toString()}`;
+  }, []);
+
+  const loadEntityData = useCallback(async () => {
+    try {
+      const locale = resolveLocale();
+      setCurrentLocale(locale);
+
+      const context = resolveCollection();
+      const fetchPath = getFetchPath(context, locale);
+      const response = await fetch(fetchPath, { credentials: 'include' });
+      
+      if (!response.ok) {
+        throw new Error('Failed to load entity data');
+      }
+
+      const data: CollectionData = await response.json();
+      setEntityData(data);
+    } catch (err) {
+      console.error('Failed to load entity:', err);
+      setError('Не удалось загрузить данные записи');
+    }
+  }, [getFetchPath, resolveCollection, resolveLocale]);
+
+  useEffect(() => {
+    loadEntityData();
+  }, [loadEntityData]);
 
   /**
    * Загружаем данные поста из Payload
    */
-  const loadPostData = async () => {
-    try {
-      // Получаем текущую локаль из URL
-      const urlParams = new URLSearchParams(window.location.search);
-      const currentLocale = urlParams.get('locale') || 'uk';
-
-      const response = await fetch(`/api/posts-new/${postId}?locale=${currentLocale}&depth=2`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to load post data');
-      }
-
-      const data = await response.json();
-      setPostData(data);
-    } catch (err) {
-      console.error('Failed to load post:', err);
-      setError('Не удалось загрузить данные поста');
-    }
-  };
-
   /**
    * Генерация FAQ
    */
   const handleGenerate = async () => {
-    if (!postData) {
-      setError('Данные поста не загружены');
+    if (!entityData) {
+      setError('Данные записи не загружены');
       return;
     }
 
@@ -100,22 +290,24 @@ export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ post
     setError(null);
 
     try {
-      // Получаем текущую локаль
-      const urlParams = new URLSearchParams(window.location.search);
-      const currentLocale = urlParams.get('locale') || 'uk';
+      const locale = resolveLocale();
+      setCurrentLocale(locale);
+
+      const collectionContext = resolveCollection();
+      const { collection } = collectionContext;
 
       // 1. Получаем suggested questions из DataForSEO
       let suggestedQuestions: string[] = [];
       
-      if (postData.seo?.focus_keyphrase) {
+      if (entityData.seo?.focus_keyphrase) {
         try {
           const dataForSeoResponse = await fetch('/api/dataforseo', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               type: 'keyword_ideas',
-              keyword: postData.seo.focus_keyphrase,
-              language_code: currentLocale,
+              keyword: entityData.seo.focus_keyphrase,
+              language_code: locale,
             }),
           });
 
@@ -129,34 +321,47 @@ export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ post
       }
 
       // 2. Конвертируем существующие FAQ из Lexical в plain text
-      const existingFaqsPlainText = (postData.faqs || []).map((faq: any) => ({
-        question: faq.question || '',
-        answer: lexicalToPlainText(faq.answer),
+      const existingFaqsPlainText = (entityData.faqs ?? []).map((faq: PostFaq | null | undefined) => ({
+        question: faq?.question ?? '',
+        answer: lexicalToPlainText(faq?.answer),
       }));
 
       console.log('[Generate FAQ] Existing FAQs:', existingFaqsPlainText.length);
-      console.log('[Generate FAQ] Focus Keyphrase:', postData.seo?.focus_keyphrase);
-      console.log('[Generate FAQ] Link Keywords structure:', postData.seo?.additional_fields);
+      console.log('[Generate FAQ] Focus Keyphrase:', entityData.seo?.focus_keyphrase);
+      console.log('[Generate FAQ] Link Keywords structure:', entityData.seo?.additional_fields);
       
-      const linkKeywords = postData.seo?.additional_fields?.keywords?.map((k: any) => k.keyword) || [];
+      const linkKeywords =
+        entityData.seo?.additional_fields?.keywords
+          ?.map((keywordEntry: { keyword?: string | null } | null | undefined): string | null =>
+            keywordEntry?.keyword ? keywordEntry.keyword : null
+          )
+          .filter((keyword): keyword is string => Boolean(keyword && keyword.trim())) ?? [];
       console.log('[Generate FAQ] Link Keywords:', linkKeywords);
+
+      const descriptionForAI = isTagEntity(entityData) ? entityData.descriptionForAI ?? '' : '';
+
+      const generatePayload = {
+        postTitle: entityData.name || '',
+        postContent: JSON.stringify(entityData.content || {}),
+        postSummary: entityData.summary || '',
+        existingFaqs: existingFaqsPlainText,
+        focusKeyphrase: entityData.seo?.focus_keyphrase || '',
+        linkKeywords,
+        suggestedQuestions,
+        userPrompt: prompt,
+        count,
+        locale,
+        collection,
+        descriptionForAI,
+      };
+
+      console.log('[Generate FAQ] Payload collection:', generatePayload.collection);
 
       // 3. Генерируем FAQ через AI
       const generateResponse = await fetch('/api/generate-faq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          postTitle: postData.name || '',
-          postContent: JSON.stringify(postData.content || {}),
-          postSummary: postData.summary || '',
-          existingFaqs: existingFaqsPlainText,
-          focusKeyphrase: postData.seo?.focus_keyphrase || '',
-          linkKeywords: linkKeywords,
-          suggestedQuestions,
-          userPrompt: prompt,
-          count,
-          locale: currentLocale,
-        }),
+        body: JSON.stringify(generatePayload),
       });
 
       if (!generateResponse.ok) {
@@ -214,16 +419,16 @@ export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ post
     setLoading(true);
     setError(null);
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const currentLocale = urlParams.get('locale') || 'ru';
+    const locale = resolveLocale();
+    setCurrentLocale(locale);
 
     // Определяем локали для перевода
     const allLocales = ['ru', 'uk', 'en'];
-    const targetLocales = allLocales.filter(l => l !== currentLocale);
+    const targetLocales = allLocales.filter(l => l !== locale);
 
     // Инициализируем прогресс
     const progressSteps: SavingProgress[] = [
-      { step: 'save_source', status: 'pending', message: `Сохранение FAQ на ${currentLocale === 'ru' ? 'русском' : currentLocale === 'uk' ? 'украинском' : 'английском'} языке` },
+      { step: 'save_source', status: 'pending', message: `Сохранение FAQ на ${locale === 'ru' ? 'русском' : locale === 'uk' ? 'украинском' : 'английском'} языке` },
     ];
 
     targetLocales.forEach(locale => {
@@ -236,17 +441,21 @@ export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ post
     setSavingProgress(progressSteps);
 
     try {
-      console.log('[Save FAQs] Starting save process...', { currentLocale, targetLocales });
+      console.log('[Save FAQs] Starting save process...', { currentLocale: locale, targetLocales });
 
       // Шаг 1: Сохраняем в текущей локали (это создаст пустые копии в других локалях)
       setSavingProgress(prev => prev.map(p => p.step === 'save_source' ? { ...p, status: 'in_progress' } : p));
       
+      const collectionContext = resolveCollection();
+      const { collection } = collectionContext;
+
       const saveResponse = await fetch('/api/save-faqs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           postId,
-          locale: currentLocale,
+          collection,
+          locale,
           faqs: acceptedFaqs.map(faq => ({ question: faq.question, answer: faq.answer })),
           mode: 'add', // Добавляем новые FAQ
         }),
@@ -259,34 +468,36 @@ export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ post
       setSavingProgress(prev => prev.map(p => p.step === 'save_source' ? { ...p, status: 'completed' } : p));
 
       // Получаем ВСЕ FAQ из исходной локали после сохранения
-      console.log('[Save FAQs] Fetching all FAQs from', currentLocale);
-      const updatedPostResponse = await fetch(`/api/posts-new/${postId}?locale=${currentLocale}&depth=0`);
-      if (!updatedPostResponse.ok) {
-        throw new Error('Failed to fetch updated post');
+      console.log('[Save FAQs] Fetching all FAQs from', locale);
+      const updatedEntityResponse = await fetch(getFetchPath(collectionContext, locale));
+      if (!updatedEntityResponse.ok) {
+        throw new Error('Failed to fetch updated entity');
       }
-      const updatedPost = await updatedPostResponse.json();
-      
+      const updatedEntity: CollectionData = await updatedEntityResponse.json();
+
       // КРИТИЧНО: Фильтруем только ВАЛИДНЫЕ FAQ (с контентом)!
       // Payload создает пустые копии в других локалях (только ID)
       // Если их не отфильтровать, мы будем переводить пустые строки!
-      const allFaqs = (updatedPost.faqs || [])
-        .filter((faq: any) => {
-          const hasQuestion = faq.question && faq.question.trim().length > 0;
-          const hasAnswer = faq.answer && 
-            typeof faq.answer === 'object' &&
-            faq.answer.root && 
-            faq.answer.root.children &&
-            faq.answer.root.children.length > 0;
+      const allFaqs: FAQItem[] = (updatedEntity.faqs ?? [])
+        .filter((faq: PostFaq | null | undefined): faq is PostFaq => {
+          if (!faq) {
+            return false;
+          }
+
+          const hasQuestion = typeof faq.question === 'string' && faq.question.trim().length > 0;
+          const hasAnswer = hasLexicalContent(faq.answer);
           
           if (!hasQuestion || !hasAnswer) {
-            console.log(`[Save FAQs] Skipping empty FAQ with ID ${faq.id}`);
+            if (faq.id) {
+              console.log(`[Save FAQs] Skipping empty FAQ with ID ${faq.id}`);
+            }
             return false;
           }
           return true;
         })
-        .map((faq: any) => ({
-          id: faq.id, // ВАЖНО: сохраняем ID для синхронизации!
-          question: faq.question,
+        .map(faq => ({
+          id: faq.id,
+          question: faq.question?.trim() ?? '',
           answer: lexicalToPlainText(faq.answer),
         }));
       
@@ -297,7 +508,7 @@ export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ post
         // Переводим ВСЕ FAQ
         setSavingProgress(prev => prev.map(p => p.step === `translate_${targetLocale}` ? { ...p, status: 'in_progress' } : p));
         
-        const translatedFaqs = await translateFAQsClient(allFaqs, currentLocale, targetLocale);
+        const translatedFaqs = await translateFAQsClient(allFaqs, locale, targetLocale);
         
         setSavingProgress(prev => prev.map(p => p.step === `translate_${targetLocale}` ? { ...p, status: 'completed' } : p));
 
@@ -309,6 +520,7 @@ export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ post
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             postId,
+            collection,
             locale: targetLocale,
             faqs: translatedFaqs,
             mode: 'replace', // ЗАМЕНЯЕМ все FAQ (не добавляем)
@@ -352,10 +564,10 @@ export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ post
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          faqs: faqs.map(faq => ({ 
-            id: faq.id, // КРИТИЧНО: сохраняем ID для синхронизации!
-            question: faq.question, 
-            answer: faq.answer 
+          faqs: faqs.map(faq => ({
+            id: faq.id,
+            question: faq.question,
+            answer: faq.answer,
           })),
           fromLocale,
           toLocale,
@@ -377,12 +589,16 @@ export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ post
         throw new Error(errorMsg);
       }
 
-      const data = await response.json();
+      type TranslateFaqsResponse = {
+        translatedFaqs: Array<{ question: string; answer: string }>;
+      };
+
+      const data: TranslateFaqsResponse = await response.json();
       
       // КРИТИЧНО: Возвращаем переведенные FAQ с сохранением ID!
       // ID нужен для синхронизации одного и того же FAQ между локалями
-      return data.translatedFaqs.map((faq: any, index: number) => ({
-        id: faqs[index]?.id, // Берем ID из исходного массива
+      return data.translatedFaqs.map((faq, index) => ({
+        id: faqs[index]?.id,
         question: faq.question,
         answer: faq.answer,
       }));
@@ -530,7 +746,7 @@ export const AIFaqGeneratorDialog: React.FC<AIFaqGeneratorDialogProps> = ({ post
               <Button
                 onClick={handleGenerate}
                 buttonStyle="primary"
-                disabled={loading || !postData}
+                disabled={loading || !entityData}
               >
                 {loading ? 'Генерация...' : '🚀 Generate FAQs'}
               </Button>

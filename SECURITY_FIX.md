@@ -11,12 +11,12 @@ GitGuardian обнаружил утечку пароля PostgreSQL в ваше�
 - Смените пароль пользователя `navi_user`
 - Обновите `.env` файл с новым паролем
 
-**Текущий скомпрометированный доступ:**
+**Текущий доступ (проверьте свои значения):**
 ```
-Host: 91.98.39.139:32769
-User: navi_user
-Database: postgres
-Schema: navi
+Host: <адрес_БД>
+User: <пользователь>
+Database: <имя_БД>
+Schema: <схема>
 ```
 
 ### 2. Очистите Git историю от паролей
@@ -29,7 +29,7 @@ brew install bfg  # для macOS
 
 # 2. Создайте файл со строками для удаления
 cat > passwords.txt << 'EOF'
-4cS2MgeUp9TDJS74ixGjOsfK0SY9xw3HUq0LsjRrsYE=
+<старый_пароль>
 EOF
 
 # 3. Клонируйте репозиторий как bare
@@ -55,8 +55,8 @@ cd /Users/al1/Navi/CascadeProjects/windsurf-project/navi-payload
 
 # 3. Создайте файл замены
 cat > replacements.txt << 'EOF'
-4cS2MgeUp9TDJS74ixGjOsfK0SY9xw3HUq0LsjRrsYE===><REMOVED_PASSWORD>
-postgresql://navi_user:4cS2MgeUp9TDJS74ixGjOsfK0SY9xw3HUq0LsjRrsYE=@==>postgresql://navi_user:<REMOVED_PASSWORD>@
+<старый_пароль>==><REMOVED_PASSWORD>
+postgresql://navi_user:<старый_пароль>@==>postgresql://navi_user:<REMOVED_PASSWORD>@
 EOF
 
 # 4. Запустите фильтрацию

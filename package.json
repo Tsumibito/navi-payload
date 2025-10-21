@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "gitleaks:scan": "gitleaks detect --source . --config .gitleaks.toml",
+    "gitleaks:protect": "gitleaks protect --source . --config .gitleaks.toml",
     "payload:types": "PAYLOAD_CONFIG_PATH=src/payload.config.ts payload generate:types",
     "payload:importmap": "PAYLOAD_CONFIG_PATH=src/payload.config.ts payload generate:importmap",
     "migrate:sanity": "NODE_OPTIONS=--no-experimental-fetch tsx scripts/migrate-sanity-to-payload.ts",

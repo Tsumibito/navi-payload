@@ -22,30 +22,30 @@
 
 ```env
 # Payload Secret (сгенерируйте: openssl rand -base64 32)
-PAYLOAD_SECRET=***REMOVED***
+PAYLOAD_SECRET=<your_payload_secret>
 
 # База данных (уже развернута на сервере)
-DATABASE_URI=postgresql://navi_user:***REMOVED***@91.98.39.139:32769/postgres?search_path=navi
+DATABASE_URI=<your_database_uri>
 
 # Cloudflare R2 Storage
-CLOUDFLARE_R2_ACCESS_KEY_ID=6f24e5054fac5482f3191cbfa1bd9c01
-CLOUDFLARE_R2_SECRET_ACCESS_KEY=***REMOVED***
-CLOUDFLARE_R2_BUCKET_NAME=navi-keystone
-CLOUDFLARE_R2_ENDPOINT=https://4b346ab1bf81ca8d2b610edfd3c5ddb0.r2.cloudflarestorage.com
-CLOUDFLARE_R2_PUBLIC_URL=https://pub-c14094474319495887321b74b5186100.r2.dev
+CLOUDFLARE_R2_ACCESS_KEY_ID=<your_cloudflare_access_key_id>
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=<your_cloudflare_secret_access_key>
+CLOUDFLARE_R2_BUCKET_NAME=<your_cloudflare_bucket_name>
+CLOUDFLARE_R2_ENDPOINT=<your_cloudflare_endpoint>
+CLOUDFLARE_R2_PUBLIC_URL=<your_cloudflare_public_url>
 
 # OpenRouter API (для AI функций)
-OPENROUTER_TOKEN=***REMOVED***
+OPENROUTER_TOKEN=<your_openrouter_token>
 ```
 
 #### Опциональные переменные:
 
 ```env
 # Baserow API (для миграции данных)
-BASEROW_API_KEY=***REMOVED***
+BASEROW_API_KEY=<your_baserow_api_key>
 
 # DataForSEO API (для SEO анализа)
-DATAFORSEO_API_KEY=***REMOVED***
+DATAFORSEO_API_KEY=<your_dataforseo_api_key>
 ```
 
 ### Шаг 3: Настройка порта

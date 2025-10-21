@@ -13,6 +13,8 @@ import { NextResponse } from 'next/server';
 const OPENROUTER_TOKEN = process.env.OPENROUTER_TOKEN;
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
+type SupportedCollection = 'posts-new' | 'tags-new';
+
 type GenerateFAQRequest = {
   // Контекст поста
   postTitle: string;
@@ -35,6 +37,8 @@ type GenerateFAQRequest = {
   
   // Локаль
   locale: string;
+  collection?: SupportedCollection;
+  descriptionForAI?: string;
 };
 
 type FAQItem = {
@@ -60,6 +64,8 @@ export async function POST(request: Request) {
       userPrompt,
       count = 5,
       locale,
+      collection = 'posts-new',
+      descriptionForAI,
     } = body;
 
     if (!OPENROUTER_TOKEN) {
@@ -76,7 +82,7 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log(`[Generate FAQ] Request: title="${postTitle}", locale=${locale}, count=${count}`);
+    console.log(`[Generate FAQ] Request: title="${postTitle}", locale=${locale}, count=${count}, collection=${collection}`);
 
     // Подготавливаем контекст для AI
     const context = prepareContext({
@@ -88,6 +94,8 @@ export async function POST(request: Request) {
       linkKeywords,
       suggestedQuestions,
       locale,
+      collection,
+      descriptionForAI,
     });
 
     // Формируем промпт
@@ -103,6 +111,7 @@ export async function POST(request: Request) {
       context: {
         suggestedQuestionsCount: suggestedQuestions.length,
         existingFaqsCount: existingFaqs.length,
+        collection,
       },
     });
 
@@ -127,6 +136,8 @@ function prepareContext(params: {
   linkKeywords: string[];
   suggestedQuestions: string[];
   locale: string;
+  collection: SupportedCollection;
+  descriptionForAI?: string;
 }) {
   const {
     postTitle,
@@ -137,6 +148,8 @@ function prepareContext(params: {
     linkKeywords,
     suggestedQuestions,
     locale,
+    collection,
+    descriptionForAI,
   } = params;
 
   // Извлекаем текст из Lexical JSON (если это JSON)
@@ -157,6 +170,7 @@ function prepareContext(params: {
   }
 
   return {
+    collection,
     locale,
     postTitle,
     postSummary: postSummary || '',
@@ -165,6 +179,7 @@ function prepareContext(params: {
     linkKeywords,
     existingFaqs,
     suggestedQuestions,
+    descriptionForAI: descriptionForAI || '',
   };
 }
 
@@ -226,7 +241,7 @@ Guidelines:
 - If Link Keywords are provided, try to use 1-2 of them in EACH FAQ item naturally
 - Keywords should fit naturally into the text, not feel forced
 
-Output format: ONLY a valid JSON array with no markdown formatting, no comments, no extra text.
+Output format: ONLY a valid JSON array with no markdown formatting, no code blocks, no extra text.
 Format: [{"question": "...", "answer": "..."}]
 
 IMPORTANT: Ensure all quotes inside question/answer text are properly escaped with backslash.`;
@@ -238,11 +253,12 @@ IMPORTANT: Ensure all quotes inside question/answer text are properly escaped wi
 function buildUserMessage(context: ReturnType<typeof prepareContext>, userPrompt: string, count: number): string {
   let message = `# Blog Post Context\n\n`;
   message += `**Title:** ${context.postTitle}\n\n`;
-  
+  message += `**Collection:** ${context.collection}\n\n`;
+
   if (context.postSummary) {
     message += `**Summary:** ${context.postSummary}\n\n`;
   }
-  
+
   if (context.focusKeyphrase) {
     message += `**Focus Keyphrase:** ${context.focusKeyphrase}\n\n`;
   }
@@ -252,6 +268,10 @@ function buildUserMessage(context: ReturnType<typeof prepareContext>, userPrompt
   }
   
   message += `**Content:**\n${context.contentText}\n\n`;
+
+  if (context.descriptionForAI) {
+    message += `**Extra Instructions:** ${context.descriptionForAI}\n\n`;
+  }
   
   if (context.existingFaqs.length > 0) {
     message += `## Existing FAQs (don't duplicate):\n\n`;

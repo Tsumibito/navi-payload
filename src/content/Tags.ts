@@ -1,8 +1,9 @@
 import type { CollectionConfig, CollectionSlug } from 'payload';
 import { lexicalEditor } from '@payloadcms/richtext-lexical';
 
-import { contentEditorFeatures } from '../utils/lexicalConfig';
+import { contentEditorFeatures, simpleEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
+import { AIFaqGeneratorButton } from '../components/AIFaqGeneratorButton';
 
 const POSTS_RELATION = 'posts-new' as unknown as CollectionSlug;
 
@@ -197,6 +198,55 @@ export const Tags: CollectionConfig = {
         {
           label: 'SEO',
           fields: [createSeoField({ localized: true })],
+        },
+        {
+          label: 'FAQs',
+          fields: [
+            {
+              type: 'ui',
+              name: 'aiFaqGenerator',
+              admin: {
+                components: {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  Field: AIFaqGeneratorButton as any,
+                },
+              },
+            },
+            {
+              type: 'array',
+              name: 'faqs',
+              label: 'Frequently Asked Questions',
+              fields: [
+                {
+                  type: 'text',
+                  name: 'question',
+                  label: 'Question',
+                  localized: true,
+                  required: true,
+                  admin: {
+                    description: 'FAQ question (localized)',
+                  },
+                },
+                {
+                  type: 'richText',
+                  name: 'answer',
+                  label: 'Answer',
+                  localized: true,
+                  required: true,
+                  editor: lexicalEditor({
+                    features: simpleEditorFeatures,
+                  }),
+                  admin: {
+                    description: 'FAQ answer (localized)',
+                  },
+                },
+              ],
+              admin: {
+                initCollapsed: true,
+                description: 'FAQ section for this tag',
+              },
+            },
+          ],
         },
       ],
     },
