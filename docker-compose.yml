@@ -1,18 +1,31 @@
 version: "3.9"
 
 services:
-  payload-postgres:
-    image: postgres:16-alpine
-    container_name: payload-postgres
+  # Payload CMS Application
+  # PostgreSQL уже развернут отдельно на сервере, подключение через DATABASE_URI
+  payload-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: payload-app
     restart: unless-stopped
-    environment:
-      POSTGRES_DB: payload
-      POSTGRES_USER: payload
-      POSTGRES_PASSWORD: payload
     ports:
-      - "5433:5432"
-    volumes:
-      - payload-postgres-data:/var/lib/postgresql/data
-
-volumes:
-  payload-postgres-data:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - PAYLOAD_SECRET=${PAYLOAD_SECRET}
+      - DATABASE_URI=${DATABASE_URI}
+      - CLOUDFLARE_R2_ACCESS_KEY_ID=${CLOUDFLARE_R2_ACCESS_KEY_ID}
+      - CLOUDFLARE_R2_SECRET_ACCESS_KEY=${CLOUDFLARE_R2_SECRET_ACCESS_KEY}
+      - CLOUDFLARE_R2_BUCKET_NAME=${CLOUDFLARE_R2_BUCKET_NAME}
+      - CLOUDFLARE_R2_ENDPOINT=${CLOUDFLARE_R2_ENDPOINT}
+      - CLOUDFLARE_R2_PUBLIC_URL=${CLOUDFLARE_R2_PUBLIC_URL}
+      - OPENROUTER_TOKEN=${OPENROUTER_TOKEN}
+      - BASEROW_API_KEY=${BASEROW_API_KEY}
+      - DATAFORSEO_API_KEY=${DATAFORSEO_API_KEY}
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/admin"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
