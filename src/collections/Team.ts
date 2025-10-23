@@ -32,6 +32,11 @@ export const Team: CollectionConfig = {
       label: 'Slug',
       required: true,
       unique: true,
+      admin: {
+        components: {
+          afterInput: ['/src/components/GenerateSlugButton#GenerateSlugButton'],
+        },
+      },
     },
     {
       type: 'upload',

@@ -47,6 +47,9 @@ export const Certificates: CollectionConfig = {
               localized: true,
               admin: {
                 description: 'URL-friendly identifier per language',
+                components: {
+                  afterInput: ['/src/components/GenerateSlugButton#GenerateSlugButton'],
+                },
               },
             },
             {

@@ -54,6 +54,9 @@ export const Team: CollectionConfig = {
               localized: true, // ✅ Локализовано - зависит от языка
               admin: {
                 description: 'URL-friendly identifier per language',
+                components: {
+                  afterInput: ['/src/components/GenerateSlugButton#GenerateSlugButton'],
+                },
               },
             },
             {

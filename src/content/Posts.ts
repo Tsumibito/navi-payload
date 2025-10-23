@@ -30,6 +30,26 @@ export const Posts: CollectionConfig = {
     update: () => true,
     delete: () => true,
   },
+  hooks: {
+    beforeChange: [
+      ({ data }) => {
+        if (!data || !Array.isArray((data as { tags?: unknown }).tags)) {
+          return data;
+        }
+
+        const nextTags = ((data as { tags?: unknown }).tags as unknown[]).filter((tag) => Boolean(tag));
+
+        if (nextTags.length === ((data as { tags?: unknown }).tags as unknown[]).length) {
+          return data;
+        }
+
+        return {
+          ...data,
+          tags: nextTags,
+        };
+      },
+    ],
+  },
   fields: [
     {
       type: 'tabs',
@@ -54,6 +74,9 @@ export const Posts: CollectionConfig = {
               localized: true, // ✅ Локализовано - зависит от языка
               admin: {
                 description: 'URL-friendly identifier per language',
+                components: {
+                  afterInput: ['/src/components/GenerateSlugButton#GenerateSlugButton'],
+                },
               },
             },
             {
@@ -113,6 +136,9 @@ export const Posts: CollectionConfig = {
               // НЕ локализовано
               admin: {
                 description: 'Post tags',
+                components: {
+                  afterInput: ['/src/components/DefineTagsButton#DefineTagsButton'],
+                },
               },
             },
             {
