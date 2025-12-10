@@ -8,7 +8,8 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Install ALL dependencies (including dev) for build
-RUN npm ci && \
+# Force NODE_ENV to development to ensure devDependencies are installed
+RUN NODE_ENV=development npm ci && \
     npm cache clean --force
 
 # Stage 2: Builder
