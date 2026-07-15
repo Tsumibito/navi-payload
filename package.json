@@ -31,14 +31,13 @@
     "graphql": "^16.11.0",
     "jsdom": "^26.1.0",
     "mime-types": "^2.1.35",
-    "next": "15.5.7",
+    "next": "16.2.10",
     "node-fetch": "^3.3.2",
     "payload": "3.86.0",
     "react": "19.1.2",
     "react-dom": "19.1.2"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/jsdom": "^21.1.6",
     "@types/mime-types": "^2.1.4",
@@ -47,7 +46,7 @@
     "@types/react-dom": "^19",
     "dotenv": "^17.2.3",
     "eslint": "^9",
-    "eslint-config-next": "15.5.7",
+    "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
     "tsx": "^4.19.1",
     "typescript": "^5"
