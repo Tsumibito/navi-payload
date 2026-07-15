@@ -69,6 +69,13 @@ export interface Config {
   collections: {
     users: User;
     media: Media;
+    redirects: Redirect;
+    'posts-new': PostsNew;
+    'tags-new': TagsNew;
+    'team-new': TeamNew;
+    certificates: Certificate;
+    trainings: Training;
+    'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -77,19 +84,32 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    redirects: RedirectsSelect<false> | RedirectsSelect<true>;
+    'posts-new': PostsNewSelect<false> | PostsNewSelect<true>;
+    'tags-new': TagsNewSelect<false> | TagsNewSelect<true>;
+    'team-new': TeamNewSelect<false> | TeamNewSelect<true>;
+    certificates: CertificatesSelect<false> | CertificatesSelect<true>;
+    trainings: TrainingsSelect<false> | TrainingsSelect<true>;
+    'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
   };
   db: {
-    defaultIDType: string;
+    defaultIDType: number;
   };
-  globals: {};
-  globalsSelect: {};
-  locale: null;
-  user: User & {
-    collection: 'users';
+  fallbackLocale: ('false' | 'none' | 'null') | false | null | ('ru' | 'uk' | 'en') | ('ru' | 'uk' | 'en')[];
+  globals: {
+    'site-globals': SiteGlobal;
   };
+  globalsSelect: {
+    'site-globals': SiteGlobalsSelect<false> | SiteGlobalsSelect<true>;
+  };
+  locale: 'ru' | 'uk' | 'en';
+  widgets: {
+    collections: CollectionsWidget;
+  };
+  user: User;
   jobs: {
     tasks: unknown;
     workflows: unknown;
@@ -118,7 +138,7 @@ export interface UserAuthOperations {
  * via the `definition` "users".
  */
 export interface User {
-  id: string;
+  id: number;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -136,14 +156,16 @@ export interface User {
       }[]
     | null;
   password?: string | null;
+  collection: 'users';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "media".
  */
 export interface Media {
-  id: string;
+  id: number;
   alt: string;
+  prefix?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -155,26 +177,746 @@ export interface Media {
   height?: number | null;
   focalX?: number | null;
   focalY?: number | null;
+  sizes?: {
+    thumbnail?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    post?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    card?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    og?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    featured?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "redirects".
+ */
+export interface Redirect {
+  id: number;
+  fromPath: string;
+  toPath: string;
+  statusCode: number;
+  /**
+   * Optional override. Defaults to creation timestamp.
+   */
+  createdAtOverride?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Blog posts with native Payload i18n
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts-new".
+ */
+export interface PostsNew {
+  id: number;
+  /**
+   * Post title (localized)
+   */
+  name?: string | null;
+  /**
+   * URL-friendly identifier per language
+   */
+  slug: string;
+  /**
+   * Main post image
+   */
+  image?: (number | null) | Media;
+  /**
+   * 1–2 sentence overview (localized)
+   */
+  summary?: string | null;
+  /**
+   * Main post content (localized)
+   */
+  content?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Select one or more team members as authors
+   */
+  authors?:
+    | {
+        relationTo: 'team-new';
+        value: number | TeamNew;
+      }[]
+    | null;
+  /**
+   * Post tags
+   */
+  tags?:
+    | {
+        relationTo: 'tags-new';
+        value: number | TagsNew;
+      }[]
+    | null;
+  /**
+   * Mark as featured post
+   */
+  featured?: boolean | null;
+  socialImages?: {
+    thumbnail?: (number | null) | Media;
+    image16x9?: (number | null) | Media;
+    image5x4?: (number | null) | Media;
+  };
+  seo?: {
+    /**
+     * Оптимально 50–60 символов
+     */
+    title?: string | null;
+    /**
+     * Оптимально 140–160 символов
+     */
+    meta_description?: string | null;
+    og_image?: (number | null) | Media;
+    /**
+     * Основной поисковый запрос, по которому оптимизируется страница
+     */
+    focus_keyphrase?: string | null;
+    focus_keyphrase_stats?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * Ключевые фразы и внутренние ссылки через запятую
+     */
+    link_keywords?: string | null;
+    additional_fields?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * Структурированные данные Schema.org в формате JSON-LD. Будет автоматически обернут в <script type="application/ld+json">
+     */
+    json_ld?: string | null;
+    no_index?: boolean | null;
+    no_follow?: boolean | null;
+  };
+  /**
+   * FAQ section for this post
+   */
+  faqs?:
+    | {
+        /**
+         * FAQ question (localized)
+         */
+        question: string;
+        /**
+         * FAQ answer (localized)
+         */
+        answer: {
+          root: {
+            type: string;
+            children: {
+              type: any;
+              version: number;
+              [k: string]: unknown;
+            }[];
+            direction: ('ltr' | 'rtl') | null;
+            format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+            indent: number;
+            version: number;
+          };
+          [k: string]: unknown;
+        };
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Team members with native Payload i18n
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "team-new".
+ */
+export interface TeamNew {
+  id: number;
+  /**
+   * Team member photo
+   */
+  photo?: (number | null) | Media;
+  /**
+   * Team member full name (localized)
+   */
+  name?: string | null;
+  /**
+   * URL-friendly identifier per language
+   */
+  slug: string;
+  /**
+   * Job title or role (localized)
+   */
+  position?: string | null;
+  /**
+   * Short bio summary (1-2 sentences, localized)
+   */
+  bio_summary?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Full biography (localized)
+   */
+  bio?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Posts authored by this team member
+   */
+  posts?:
+    | {
+        relationTo: 'posts-new';
+        value: number | PostsNew;
+      }[]
+    | null;
+  /**
+   * Order in team list (lower = first)
+   */
+  order?: number | null;
+  /**
+   * Contact information and social media links
+   */
+  links?:
+    | {
+        service: 'email' | 'phone' | 'x' | 'facebook' | 'instagram' | 'linkedin' | 'github' | 'website';
+        /**
+         * For email: mailto:email@example.com, for phone: tel:+1234567890
+         */
+        url: string;
+        id?: string | null;
+      }[]
+    | null;
+  seo?: {
+    /**
+     * Оптимально 50–60 символов
+     */
+    title?: string | null;
+    /**
+     * Оптимально 140–160 символов
+     */
+    meta_description?: string | null;
+    og_image?: (number | null) | Media;
+    /**
+     * Основной поисковый запрос, по которому оптимизируется страница
+     */
+    focus_keyphrase?: string | null;
+    focus_keyphrase_stats?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * Ключевые фразы и внутренние ссылки через запятую
+     */
+    link_keywords?: string | null;
+    additional_fields?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * Структурированные данные Schema.org в формате JSON-LD. Будет автоматически обернут в <script type="application/ld+json">
+     */
+    json_ld?: string | null;
+    no_index?: boolean | null;
+    no_follow?: boolean | null;
+  };
+  /**
+   * FAQ section for this team member page
+   */
+  faqs?:
+    | {
+        /**
+         * FAQ question (localized)
+         */
+        question: string;
+        /**
+         * FAQ answer (localized)
+         */
+        answer: {
+          root: {
+            type: string;
+            children: {
+              type: any;
+              version: number;
+              [k: string]: unknown;
+            }[];
+            direction: ('ltr' | 'rtl') | null;
+            format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+            indent: number;
+            version: number;
+          };
+          [k: string]: unknown;
+        };
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Localized tags managed via native Payload i18n
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tags-new".
+ */
+export interface TagsNew {
+  id: number;
+  /**
+   * Tag display name (localized)
+   */
+  name: string;
+  /**
+   * Tag URL slug (localized)
+   */
+  slug: string;
+  image?: (number | null) | Media;
+  /**
+   * 1–2 sentence overview (localized)
+   */
+  summary?: string | null;
+  /**
+   * Main copy for the tag page (localized)
+   */
+  content?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Attach relevant posts
+   */
+  posts?: (number | PostsNew)[] | null;
+  /**
+   * Optional hints for AI assistants (localized)
+   */
+  descriptionForAI?: string | null;
+  /**
+   * Optional artwork for different aspect ratios
+   */
+  socialImages?: {
+    thumbnail?: (number | null) | Media;
+    image16x9?: (number | null) | Media;
+    image5x4?: (number | null) | Media;
+  };
+  seo?: {
+    /**
+     * Оптимально 50–60 символов
+     */
+    title?: string | null;
+    /**
+     * Оптимально 140–160 символов
+     */
+    meta_description?: string | null;
+    og_image?: (number | null) | Media;
+    /**
+     * Основной поисковый запрос, по которому оптимизируется страница
+     */
+    focus_keyphrase?: string | null;
+    focus_keyphrase_stats?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * Ключевые фразы и внутренние ссылки через запятую
+     */
+    link_keywords?: string | null;
+    additional_fields?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * Структурированные данные Schema.org в формате JSON-LD. Будет автоматически обернут в <script type="application/ld+json">
+     */
+    json_ld?: string | null;
+    no_index?: boolean | null;
+    no_follow?: boolean | null;
+  };
+  /**
+   * FAQ section for this tag
+   */
+  faqs?:
+    | {
+        /**
+         * FAQ question (localized)
+         */
+        question: string;
+        /**
+         * FAQ answer (localized)
+         */
+        answer: {
+          root: {
+            type: string;
+            children: {
+              type: any;
+              version: number;
+              [k: string]: unknown;
+            }[];
+            direction: ('ltr' | 'rtl') | null;
+            format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+            indent: number;
+            version: number;
+          };
+          [k: string]: unknown;
+        };
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "certificates".
+ */
+export interface Certificate {
+  id: number;
+  /**
+   * Certificate name (localized)
+   */
+  name: string;
+  /**
+   * URL-friendly identifier per language
+   */
+  slug: string;
+  /**
+   * Front side of the certificate
+   */
+  frontImage?: (number | null) | Media;
+  /**
+   * Back side of the certificate
+   */
+  backImage?: (number | null) | Media;
+  /**
+   * Certificate description (localized)
+   */
+  description?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Requirements to obtain (localized)
+   */
+  requirements?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Training program details (localized)
+   */
+  program?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  seo?: {
+    /**
+     * Оптимально 50–60 символов
+     */
+    title?: string | null;
+    /**
+     * Оптимально 140–160 символов
+     */
+    meta_description?: string | null;
+    og_image?: (number | null) | Media;
+    /**
+     * Основной поисковый запрос, по которому оптимизируется страница
+     */
+    focus_keyphrase?: string | null;
+    focus_keyphrase_stats?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * Ключевые фразы и внутренние ссылки через запятую
+     */
+    link_keywords?: string | null;
+    additional_fields?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * Структурированные данные Schema.org в формате JSON-LD. Будет автоматически обернут в <script type="application/ld+json">
+     */
+    json_ld?: string | null;
+    no_index?: boolean | null;
+    no_follow?: boolean | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trainings".
+ */
+export interface Training {
+  id: number;
+  /**
+   * Training name (localized)
+   */
+  name: string;
+  /**
+   * URL-friendly identifier per language
+   */
+  slug: string;
+  seo?: {
+    /**
+     * Оптимально 50–60 символов
+     */
+    title?: string | null;
+    /**
+     * Оптимально 140–160 символов
+     */
+    meta_description?: string | null;
+    og_image?: (number | null) | Media;
+    /**
+     * Основной поисковый запрос, по которому оптимизируется страница
+     */
+    focus_keyphrase?: string | null;
+    focus_keyphrase_stats?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * Ключевые фразы и внутренние ссылки через запятую
+     */
+    link_keywords?: string | null;
+    additional_fields?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * Структурированные данные Schema.org в формате JSON-LD. Будет автоматически обернут в <script type="application/ld+json">
+     */
+    json_ld?: string | null;
+    no_index?: boolean | null;
+    no_follow?: boolean | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-kv".
+ */
+export interface PayloadKv {
+  id: number;
+  key: string;
+  data:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-locked-documents".
  */
 export interface PayloadLockedDocument {
-  id: string;
+  id: number;
   document?:
     | ({
         relationTo: 'users';
-        value: string | User;
+        value: number | User;
       } | null)
     | ({
         relationTo: 'media';
-        value: string | Media;
+        value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'redirects';
+        value: number | Redirect;
+      } | null)
+    | ({
+        relationTo: 'posts-new';
+        value: number | PostsNew;
+      } | null)
+    | ({
+        relationTo: 'tags-new';
+        value: number | TagsNew;
+      } | null)
+    | ({
+        relationTo: 'team-new';
+        value: number | TeamNew;
+      } | null)
+    | ({
+        relationTo: 'certificates';
+        value: number | Certificate;
+      } | null)
+    | ({
+        relationTo: 'trainings';
+        value: number | Training;
       } | null);
   globalSlug?: string | null;
   user: {
     relationTo: 'users';
-    value: string | User;
+    value: number | User;
   };
   updatedAt: string;
   createdAt: string;
@@ -184,10 +926,10 @@ export interface PayloadLockedDocument {
  * via the `definition` "payload-preferences".
  */
 export interface PayloadPreference {
-  id: string;
+  id: number;
   user: {
     relationTo: 'users';
-    value: string | User;
+    value: number | User;
   };
   key?: string | null;
   value?:
@@ -207,7 +949,7 @@ export interface PayloadPreference {
  * via the `definition` "payload-migrations".
  */
 export interface PayloadMigration {
-  id: string;
+  id: number;
   name?: string | null;
   batch?: number | null;
   updatedAt: string;
@@ -241,6 +983,7 @@ export interface UsersSelect<T extends boolean = true> {
  */
 export interface MediaSelect<T extends boolean = true> {
   alt?: T;
+  prefix?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -252,6 +995,265 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+  sizes?:
+    | T
+    | {
+        thumbnail?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        post?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        card?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        og?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        featured?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+      };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "redirects_select".
+ */
+export interface RedirectsSelect<T extends boolean = true> {
+  fromPath?: T;
+  toPath?: T;
+  statusCode?: T;
+  createdAtOverride?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts-new_select".
+ */
+export interface PostsNewSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  image?: T;
+  summary?: T;
+  content?: T;
+  authors?: T;
+  tags?: T;
+  featured?: T;
+  socialImages?:
+    | T
+    | {
+        thumbnail?: T;
+        image16x9?: T;
+        image5x4?: T;
+      };
+  seo?:
+    | T
+    | {
+        title?: T;
+        meta_description?: T;
+        og_image?: T;
+        focus_keyphrase?: T;
+        focus_keyphrase_stats?: T;
+        link_keywords?: T;
+        additional_fields?: T;
+        json_ld?: T;
+        no_index?: T;
+        no_follow?: T;
+      };
+  faqs?:
+    | T
+    | {
+        question?: T;
+        answer?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tags-new_select".
+ */
+export interface TagsNewSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  image?: T;
+  summary?: T;
+  content?: T;
+  posts?: T;
+  descriptionForAI?: T;
+  socialImages?:
+    | T
+    | {
+        thumbnail?: T;
+        image16x9?: T;
+        image5x4?: T;
+      };
+  seo?:
+    | T
+    | {
+        title?: T;
+        meta_description?: T;
+        og_image?: T;
+        focus_keyphrase?: T;
+        focus_keyphrase_stats?: T;
+        link_keywords?: T;
+        additional_fields?: T;
+        json_ld?: T;
+        no_index?: T;
+        no_follow?: T;
+      };
+  faqs?:
+    | T
+    | {
+        question?: T;
+        answer?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "team-new_select".
+ */
+export interface TeamNewSelect<T extends boolean = true> {
+  photo?: T;
+  name?: T;
+  slug?: T;
+  position?: T;
+  bio_summary?: T;
+  bio?: T;
+  posts?: T;
+  order?: T;
+  links?:
+    | T
+    | {
+        service?: T;
+        url?: T;
+        id?: T;
+      };
+  seo?:
+    | T
+    | {
+        title?: T;
+        meta_description?: T;
+        og_image?: T;
+        focus_keyphrase?: T;
+        focus_keyphrase_stats?: T;
+        link_keywords?: T;
+        additional_fields?: T;
+        json_ld?: T;
+        no_index?: T;
+        no_follow?: T;
+      };
+  faqs?:
+    | T
+    | {
+        question?: T;
+        answer?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "certificates_select".
+ */
+export interface CertificatesSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  frontImage?: T;
+  backImage?: T;
+  description?: T;
+  requirements?: T;
+  program?: T;
+  seo?:
+    | T
+    | {
+        title?: T;
+        meta_description?: T;
+        og_image?: T;
+        focus_keyphrase?: T;
+        focus_keyphrase_stats?: T;
+        link_keywords?: T;
+        additional_fields?: T;
+        json_ld?: T;
+        no_index?: T;
+        no_follow?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trainings_select".
+ */
+export interface TrainingsSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  seo?:
+    | T
+    | {
+        title?: T;
+        meta_description?: T;
+        og_image?: T;
+        focus_keyphrase?: T;
+        focus_keyphrase_stats?: T;
+        link_keywords?: T;
+        additional_fields?: T;
+        json_ld?: T;
+        no_index?: T;
+        no_follow?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-kv_select".
+ */
+export interface PayloadKvSelect<T extends boolean = true> {
+  key?: T;
+  data?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -284,6 +1286,96 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-globals".
+ */
+export interface SiteGlobal {
+  id: number;
+  title: string;
+  tagline?: string | null;
+  description?: string | null;
+  url?: string | null;
+  favicon?: (number | null) | Media;
+  logo?: (number | null) | Media;
+  logoDarkMode?: (number | null) | Media;
+  accentColor?: string | null;
+  socialLinks?:
+    | {
+        service?: string | null;
+        url?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Управление языками сайта
+   */
+  availableLanguages?:
+    | {
+        /**
+         * ISO код языка (ru, uk, en, pl, fr, es, de)
+         */
+        code: string;
+        /**
+         * Название языка
+         */
+        name: string;
+        /**
+         * Флаг для отображения (например 🇷🇺)
+         */
+        flag?: string | null;
+        enabled?: boolean | null;
+        isDefault?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-globals_select".
+ */
+export interface SiteGlobalsSelect<T extends boolean = true> {
+  title?: T;
+  tagline?: T;
+  description?: T;
+  url?: T;
+  favicon?: T;
+  logo?: T;
+  logoDarkMode?: T;
+  accentColor?: T;
+  socialLinks?:
+    | T
+    | {
+        service?: T;
+        url?: T;
+        id?: T;
+      };
+  availableLanguages?:
+    | T
+    | {
+        code?: T;
+        name?: T;
+        flag?: T;
+        enabled?: T;
+        isDefault?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collections_widget".
+ */
+export interface CollectionsWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'full';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

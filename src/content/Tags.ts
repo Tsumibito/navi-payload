@@ -3,7 +3,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 
 import { contentEditorFeatures, simpleEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
-import { AIFaqGeneratorButton } from '../components/AIFaqGeneratorButton';
+import { authenticated } from '../access/authenticated';
 
 const POSTS_RELATION = 'posts-new' as unknown as CollectionSlug;
 
@@ -44,6 +44,12 @@ export const Tags: CollectionConfig = {
     plural: 'Tags',
   },
   versions: false,
+  access: {
+    read: () => true,
+    create: authenticated,
+    update: authenticated,
+    delete: authenticated,
+  },
   admin: {
     useAsTitle: 'name',
     defaultColumns: ['name', 'slug'],
@@ -208,7 +214,7 @@ export const Tags: CollectionConfig = {
               admin: {
                 components: {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  Field: AIFaqGeneratorButton as any,
+                  Field: '/src/components/AIFaqGeneratorButton#AIFaqGeneratorButton',
                 },
               },
             },

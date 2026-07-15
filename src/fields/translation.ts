@@ -115,7 +115,7 @@ export const translationFields = (options: TranslationFieldOptions = {}): Field[
   }
 
   if (includeSeo) {
-    fields.push(createSeoField({ includeOverall: false }));
+    fields.push(createSeoField({ includeOverview: false }));
   }
 
   return fields;

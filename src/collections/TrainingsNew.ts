@@ -1,5 +1,7 @@
 import type { CollectionConfig } from 'payload';
 
+import { authenticated, publishedOrAuthenticated } from '../access/authenticated';
+
 export const TrainingsNew: CollectionConfig = {
   slug: 'trainings-new',
   labels: {
@@ -19,10 +21,10 @@ export const TrainingsNew: CollectionConfig = {
     group: 'Content',
   },
   access: {
-    read: () => true,
-    create: () => true,
-    update: () => true,
-    delete: () => true,
+    read: publishedOrAuthenticated,
+    create: authenticated,
+    update: authenticated,
+    delete: authenticated,
   },
   fields: [
     {

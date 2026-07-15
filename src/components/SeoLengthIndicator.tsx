@@ -193,7 +193,7 @@ function SeoLengthIndicatorBase(props: SeoLengthIndicatorProps) {
     }
 
     const readValue = () => {
-      const nextValue = 'value' in element ? element.value : element.textContent ?? '';
+      const nextValue = element.value;
       setDomValue(nextValue ?? '');
       if (isDebugEnabled()) {
         console.log('SeoLengthIndicator: DOM value updated', { resolvedPath, nextValue });

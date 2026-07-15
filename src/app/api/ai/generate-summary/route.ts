@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { authenticatePayloadRequest, unauthorizedResponse } from '@/utils/authenticatedPayload';
+
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL = 'anthropic/claude-3.5-sonnet';
 
@@ -25,6 +27,9 @@ const SYSTEM_PROMPTS = {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await authenticatePayloadRequest(request);
+    if (!auth) return unauthorizedResponse();
+
     const body: GenerateSummaryRequest = await request.json();
     const { content, language, title, kind = 'post' } = body;
 

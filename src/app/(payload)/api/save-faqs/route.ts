@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 import { NextResponse } from 'next/server';
-import { getPayload } from 'payload';
-import config from '@payload-config';
+
+import { authenticatePayloadRequest, unauthorizedResponse } from '@/utils/authenticatedPayload';
 
 /**
  * API endpoint для сохранения FAQ
@@ -51,6 +51,9 @@ export async function POST(request: Request) {
   console.log('[Save FAQs] POST request received');
   
   try {
+    const auth = await authenticatePayloadRequest(request);
+    if (!auth) return unauthorizedResponse();
+
     const body: SaveFAQsRequest = await request.json();
     console.log('[Save FAQs] Request body:', JSON.stringify(body, null, 2));
     
@@ -68,7 +71,7 @@ export async function POST(request: Request) {
 
     console.log(`[Save FAQs] Saving ${faqs.length} FAQs for ${collection} ${postId} (locale: ${locale})`);
 
-    const payload = await getPayload({ config });
+    const { payload } = auth;
 
     // Получаем существующий пост
     console.log('[Save FAQs] Fetching document...', { collection, id: postId, locale });
@@ -270,4 +273,3 @@ function stringToLexical(text: string) {
     },
   };
 }
-

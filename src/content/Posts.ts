@@ -3,7 +3,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 
 import { contentEditorFeatures, simpleEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
-import { AIFaqGeneratorButton } from '../components/AIFaqGeneratorButton';
+import { authenticated } from '../access/authenticated';
 
 const TEAM_RELATION = 'team-new' as unknown as CollectionSlug;
 const TAGS_RELATION = 'tags-new' as unknown as CollectionSlug;
@@ -20,15 +20,12 @@ export const Posts: CollectionConfig = {
     defaultColumns: ['name', 'slug', 'published_at', 'featured'],
     description: 'Blog posts with native Payload i18n',
     group: 'Content',
-    defaultPopulate: {
-      depth: 1,
-    },
   },
   access: {
     read: () => true,
-    create: () => true,
-    update: () => true,
-    delete: () => true,
+    create: authenticated,
+    update: authenticated,
+    delete: authenticated,
   },
   hooks: {
     beforeChange: [
@@ -199,8 +196,7 @@ export const Posts: CollectionConfig = {
               name: 'aiFaqGenerator',
               admin: {
                 components: {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  Field: AIFaqGeneratorButton as any,
+                  Field: '/src/components/AIFaqGeneratorButton#AIFaqGeneratorButton',
                 },
               },
             },

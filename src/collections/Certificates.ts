@@ -3,6 +3,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 
 import { contentEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
+import { authenticated } from '../access/authenticated';
 
 export const Certificates: CollectionConfig = {
   slug: 'certificates',
@@ -18,9 +19,9 @@ export const Certificates: CollectionConfig = {
   },
   access: {
     read: () => true,
-    create: () => true,
-    update: () => true,
-    delete: () => true,
+    create: authenticated,
+    update: authenticated,
+    delete: authenticated,
   },
   fields: [
     {

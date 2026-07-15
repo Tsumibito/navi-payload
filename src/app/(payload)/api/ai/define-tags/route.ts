@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import config from '@payload-config';
-import { getPayload } from 'payload';
 
 import { extractTextFromLexical } from '@/utils/lexicalLinkAnalysis';
+import { authenticatePayloadRequest, unauthorizedResponse } from '@/utils/authenticatedPayload';
 
 const POSTS_COLLECTION = 'posts-new';
 const TAGS_COLLECTION = 'tags-new';
@@ -82,6 +81,9 @@ function normalizeId(input: unknown, depth = 0): string | null {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await authenticatePayloadRequest(request);
+    if (!auth) return unauthorizedResponse();
+
     const body = await request.json();
     const postId = typeof body?.postId === 'string' ? body.postId : undefined;
 
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'OPENROUTER_TOKEN not configured' }, { status: 500 });
     }
 
-    const payload = await getPayload({ config });
+    const { payload } = auth;
     const payloadClient = payload as unknown as PayloadClient;
 
     const post = (await payloadClient.findByID({

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPayload } from 'payload';
-import config from '@payload-config';
 import { countInternalLinks } from '@/modules/linkCounter';
 import { countPotentialLinks } from '@/modules/potentialLinkCounter';
+import { authenticatePayloadRequest, unauthorizedResponse } from '@/utils/authenticatedPayload';
 
 type LinkStatsResult = {
   anchor: string;
@@ -30,7 +29,9 @@ type LinkStatsResult = {
  */
 export async function POST(request: NextRequest) {
   try {
-    const payload = await getPayload({ config });
+    const auth = await authenticatePayloadRequest(request);
+    if (!auth) return unauthorizedResponse();
+    const { payload } = auth;
     const body = await request.json();
 
     const { entity_type, entity_id, language, anchors, targetSlug, includeDetails } = body;

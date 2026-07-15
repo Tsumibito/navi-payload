@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { authenticatePayloadRequest, unauthorizedResponse } from '@/utils/authenticatedPayload';
+
 /**
  * API endpoint для AI-генерации FAQ
  * 
@@ -51,6 +53,9 @@ type FAQItem = {
  */
 export async function POST(request: Request) {
   try {
+    const auth = await authenticatePayloadRequest(request);
+    if (!auth) return unauthorizedResponse();
+
     const body: GenerateFAQRequest = await request.json();
     
     const {

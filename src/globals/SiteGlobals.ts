@@ -1,8 +1,14 @@
 import type { GlobalConfig } from 'payload';
 
+import { authenticated } from '../access/authenticated';
+
 export const SiteGlobals: GlobalConfig = {
   slug: 'site-globals',
   label: 'Site Globals',
+  access: {
+    read: () => true,
+    update: authenticated,
+  },
   fields: [
     {
       type: 'text',

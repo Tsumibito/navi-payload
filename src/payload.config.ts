@@ -24,7 +24,7 @@ export default buildConfig({
   admin: {
     user: Users.slug,
     importMap: {
-      baseDir: path.resolve(dirname),
+      baseDir: path.resolve(dirname, '..'),
       autoGenerate: false,
     },
   },
@@ -44,6 +44,7 @@ export default buildConfig({
     fallback: true,
   },
   db: postgresAdapter({
+    schemaName: process.env.PAYLOAD_DB_SCHEMA || 'navi',
     pool: {
       connectionString: process.env.DATABASE_URI || '',
     },

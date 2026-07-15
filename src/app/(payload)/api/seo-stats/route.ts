@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPayload } from 'payload';
-import config from '@payload-config';
-import { sql } from 'drizzle-orm';
+import { sql } from '@payloadcms/db-postgres/drizzle';
+
+import { authenticatePayloadRequest, unauthorizedResponse } from '@/utils/authenticatedPayload';
 
 export async function GET(request: NextRequest) {
   try {
-    const payload = await getPayload({ config });
+    const auth = await authenticatePayloadRequest(request);
+    if (!auth) return unauthorizedResponse();
+    const { payload } = auth;
     const { searchParams } = new URL(request.url);
     
     const entityType = searchParams.get('entity_type');
@@ -41,7 +43,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const payload = await getPayload({ config });
+    const auth = await authenticatePayloadRequest(request);
+    if (!auth) return unauthorizedResponse();
+    const { payload } = auth;
     const body = await request.json();
     
     const { entity_type, entity_id, locale, focus_keyphrase, stats, link_keywords, calculated_at } = body;

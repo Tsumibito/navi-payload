@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { authenticatePayloadRequest, unauthorizedResponse } from '@/utils/authenticatedPayload';
+
 export async function POST(request: NextRequest) {
   try {
+    const auth = await authenticatePayloadRequest(request);
+    if (!auth) return unauthorizedResponse();
+
     const body = await request.json();
     const { url } = body;
 

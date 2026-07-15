@@ -1,5 +1,7 @@
 import type { CollectionConfig } from 'payload';
 
+import { authenticated } from '../access/authenticated';
+
 export const Redirects: CollectionConfig = {
   slug: 'redirects',
   labels: {
@@ -9,6 +11,12 @@ export const Redirects: CollectionConfig = {
   admin: {
     useAsTitle: 'fromPath',
     defaultColumns: ['fromPath', 'toPath', 'statusCode'],
+  },
+  access: {
+    read: () => true,
+    create: authenticated,
+    update: authenticated,
+    delete: authenticated,
   },
   fields: [
     {

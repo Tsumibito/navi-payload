@@ -1,5 +1,7 @@
 import type { CollectionConfig } from 'payload';
 
+import { authenticated } from '../access/authenticated';
+
 export const SeoStats: CollectionConfig = {
   slug: 'seo-stats',
   labels: {
@@ -10,10 +12,10 @@ export const SeoStats: CollectionConfig = {
     hidden: true, // Скрываем из меню - доступ только через API
   },
   access: {
-    read: () => true,
-    create: () => true,
-    update: () => true,
-    delete: () => true,
+    read: authenticated,
+    create: authenticated,
+    update: authenticated,
+    delete: authenticated,
   },
   fields: [
     {

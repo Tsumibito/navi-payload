@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { authenticatePayloadRequest, unauthorizedResponse } from '@/utils/authenticatedPayload';
+
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_TOKEN = process.env.OPENROUTER_TOKEN;
 const CYRILLIC_REGEX = /[А-Яа-яЁёІіЇїЄєҐґ]/g;
@@ -28,6 +30,9 @@ type TranslationRequest = {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await authenticatePayloadRequest(request);
+    if (!auth) return unauthorizedResponse();
+
     const body: TranslationRequest = await request.json();
     const { faqs, fromLocale, toLocale } = body;
 

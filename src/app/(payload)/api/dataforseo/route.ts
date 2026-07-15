@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { authenticatePayloadRequest, unauthorizedResponse } from '@/utils/authenticatedPayload';
+
 /**
  * API endpoint для получения данных из DataForSEO
  * 
@@ -24,6 +26,9 @@ type DataForSEORequest = {
  */
 export async function POST(request: Request) {
   try {
+    const auth = await authenticatePayloadRequest(request);
+    if (!auth) return unauthorizedResponse();
+
     const body: DataForSEORequest = await request.json();
     const { type, keyword, language_code, location } = body;
 

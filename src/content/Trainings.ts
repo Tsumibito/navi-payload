@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload';
 
 import { createSeoField } from '../fields/seo';
+import { authenticated, publishedOrAuthenticated } from '../access/authenticated';
 
 export const Trainings: CollectionConfig = {
   slug: 'trainings',
@@ -22,10 +23,10 @@ export const Trainings: CollectionConfig = {
     group: 'Content',
   },
   access: {
-    read: () => true,
-    create: () => true,
-    update: () => true,
-    delete: () => true,
+    read: publishedOrAuthenticated,
+    create: authenticated,
+    update: authenticated,
+    delete: authenticated,
   },
   fields: [
     {

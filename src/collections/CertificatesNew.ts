@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload';
 import { lexicalEditor } from '@payloadcms/richtext-lexical';
 
 import { contentEditorFeatures } from '../utils/lexicalConfig';
+import { authenticated } from '../access/authenticated';
 
 export const CertificatesNew: CollectionConfig = {
   slug: 'certificates-new',
@@ -15,10 +16,10 @@ export const CertificatesNew: CollectionConfig = {
     group: 'Content',
   },
   access: {
-    read: () => true,
-    create: () => true,
-    update: () => true,
-    delete: () => true,
+    read: authenticated,
+    create: authenticated,
+    update: authenticated,
+    delete: authenticated,
   },
   fields: [
     {
