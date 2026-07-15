@@ -47,6 +47,10 @@ export default buildConfig({
     schemaName: process.env.PAYLOAD_DB_SCHEMA || 'navi',
     pool: {
       connectionString: process.env.DATABASE_URI || '',
+      min: 0,
+      max: 5,
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 10_000,
     },
     push: false,
   }),
