@@ -4,6 +4,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 
 # Keep this layer reusable until the dependency manifests change.
 COPY package.json package-lock.json ./
@@ -22,7 +23,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-RUN apk add --no-cache libc6-compat && \
+RUN apk add --no-cache libc6-compat curl && \
   addgroup --system --gid 1001 nodejs && \
   adduser --system --uid 1001 nextjs
 
@@ -38,6 +39,6 @@ EXPOSE 3000
 
 # Static endpoint: verifies the app without opening a database connection.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD wget -q -O /dev/null http://127.0.0.1:3000/api/health || exit 1
+  CMD curl -fsS http://127.0.0.1:3000/api/health || exit 1
 
 CMD ["node", "server.js"]
