@@ -16,6 +16,7 @@ import { Certificates } from './collections/Certificates'
 import { Trainings } from './content/Trainings'
 import { SiteGlobals } from './globals/SiteGlobals'
 import { Redirects } from './collections/Redirects'
+import { Pages } from './content/Pages'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -29,7 +30,7 @@ export default buildConfig({
     },
   },
   defaultDepth: 1,
-  collections: [Users, Media, Redirects, Posts, Tags, Team, Certificates, Trainings],
+  collections: [Users, Media, Redirects, Pages, Posts, Tags, Team, Certificates, Trainings],
   globals: [SiteGlobals],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',

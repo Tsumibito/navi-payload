@@ -4,6 +4,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 import { contentEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
 import { authenticated } from '../access/authenticated';
+import { createPublicSlugField } from '../fields/publicSlug';
 
 export const Certificates: CollectionConfig = {
   slug: 'certificates',
@@ -24,6 +25,7 @@ export const Certificates: CollectionConfig = {
     delete: authenticated,
   },
   fields: [
+    createPublicSlugField(),
     {
       type: 'tabs',
       tabs: [

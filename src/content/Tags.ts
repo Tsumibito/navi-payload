@@ -4,6 +4,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 import { contentEditorFeatures, simpleEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
 import { authenticated } from '../access/authenticated';
+import { createPublicSlugField } from '../fields/publicSlug';
 
 const POSTS_RELATION = 'posts-new' as unknown as CollectionSlug;
 
@@ -82,6 +83,7 @@ export const Tags: CollectionConfig = {
     ],
   },
   fields: [
+    createPublicSlugField(),
     {
       type: 'tabs',
       tabs: [

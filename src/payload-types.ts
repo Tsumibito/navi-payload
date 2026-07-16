@@ -70,6 +70,7 @@ export interface Config {
     users: User;
     media: Media;
     redirects: Redirect;
+    pages: Page;
     'posts-new': PostsNew;
     'tags-new': TagsNew;
     'team-new': TeamNew;
@@ -85,6 +86,7 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     redirects: RedirectsSelect<false> | RedirectsSelect<true>;
+    pages: PagesSelect<false> | PagesSelect<true>;
     'posts-new': PostsNewSelect<false> | PostsNewSelect<true>;
     'tags-new': TagsNewSelect<false> | TagsNewSelect<true>;
     'team-new': TeamNewSelect<false> | TeamNewSelect<true>;
@@ -237,6 +239,86 @@ export interface Redirect {
   createdAt: string;
 }
 /**
+ * Static and listing-page content with frozen production routes
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pages".
+ */
+export interface Page {
+  id: number;
+  /**
+   * Stable routing identifier shared by all locales.
+   */
+  pageKey: string;
+  pageType: 'root' | 'listing' | 'static';
+  /**
+   * Frozen production URL slug. Non-localized and independent from translated editorial slugs.
+   */
+  publicSlug?: string | null;
+  h1?: string | null;
+  content?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  seo?: {
+    /**
+     * Оптимально 50–60 символов
+     */
+    title?: string | null;
+    /**
+     * Оптимально 140–160 символов
+     */
+    meta_description?: string | null;
+    og_image?: (number | null) | Media;
+    /**
+     * Основной поисковый запрос, по которому оптимизируется страница
+     */
+    focus_keyphrase?: string | null;
+    focus_keyphrase_stats?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * Ключевые фразы и внутренние ссылки через запятую
+     */
+    link_keywords?: string | null;
+    additional_fields?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * Структурированные данные Schema.org в формате JSON-LD. Будет автоматически обернут в <script type="application/ld+json">
+     */
+    json_ld?: string | null;
+    no_index?: boolean | null;
+    no_follow?: boolean | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
  * Blog posts with native Payload i18n
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -244,6 +326,10 @@ export interface Redirect {
  */
 export interface PostsNew {
   id: number;
+  /**
+   * Frozen production URL slug. Non-localized and independent from translated editorial slugs.
+   */
+  publicSlug?: string | null;
   /**
    * Post title (localized)
    */
@@ -389,6 +475,10 @@ export interface PostsNew {
  */
 export interface TeamNew {
   id: number;
+  /**
+   * Frozen production URL slug. Non-localized and independent from translated editorial slugs.
+   */
+  publicSlug?: string | null;
   /**
    * Team member photo
    */
@@ -552,6 +642,10 @@ export interface TeamNew {
 export interface TagsNew {
   id: number;
   /**
+   * Frozen production URL slug. Non-localized and independent from translated editorial slugs.
+   */
+  publicSlug?: string | null;
+  /**
    * Tag display name (localized)
    */
   name: string;
@@ -680,6 +774,10 @@ export interface TagsNew {
  */
 export interface Certificate {
   id: number;
+  /**
+   * Frozen production URL slug. Non-localized and independent from translated editorial slugs.
+   */
+  publicSlug?: string | null;
   /**
    * Certificate name (localized)
    */
@@ -894,6 +992,10 @@ export interface PayloadLockedDocument {
         value: number | Redirect;
       } | null)
     | ({
+        relationTo: 'pages';
+        value: number | Page;
+      } | null)
+    | ({
         relationTo: 'posts-new';
         value: number | PostsNew;
       } | null)
@@ -1064,9 +1166,38 @@ export interface RedirectsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pages_select".
+ */
+export interface PagesSelect<T extends boolean = true> {
+  pageKey?: T;
+  pageType?: T;
+  publicSlug?: T;
+  h1?: T;
+  content?: T;
+  seo?:
+    | T
+    | {
+        title?: T;
+        meta_description?: T;
+        og_image?: T;
+        focus_keyphrase?: T;
+        focus_keyphrase_stats?: T;
+        link_keywords?: T;
+        additional_fields?: T;
+        json_ld?: T;
+        no_index?: T;
+        no_follow?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "posts-new_select".
  */
 export interface PostsNewSelect<T extends boolean = true> {
+  publicSlug?: T;
   name?: T;
   slug?: T;
   image?: T;
@@ -1111,6 +1242,7 @@ export interface PostsNewSelect<T extends boolean = true> {
  * via the `definition` "tags-new_select".
  */
 export interface TagsNewSelect<T extends boolean = true> {
+  publicSlug?: T;
   name?: T;
   slug?: T;
   image?: T;
@@ -1154,6 +1286,7 @@ export interface TagsNewSelect<T extends boolean = true> {
  * via the `definition` "team-new_select".
  */
 export interface TeamNewSelect<T extends boolean = true> {
+  publicSlug?: T;
   photo?: T;
   name?: T;
   slug?: T;
@@ -1198,6 +1331,7 @@ export interface TeamNewSelect<T extends boolean = true> {
  * via the `definition` "certificates_select".
  */
 export interface CertificatesSelect<T extends boolean = true> {
+  publicSlug?: T;
   name?: T;
   slug?: T;
   frontImage?: T;
