@@ -20,6 +20,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import { URL } from 'url';
+import { fileURLToPath } from 'url';
 
 type Locale = 'ru' | 'uk' | 'en';
 
@@ -206,17 +207,46 @@ function endpointFingerprint(uri: string): string {
   return `${parsed.hostname.toLowerCase()}:${parsed.port || 5432}:${parsed.pathname.slice(1)}`;
 }
 
-function assertNotProduction(env: Record<string, string>, allowProduction: boolean): void {
+// Root Navi directory resolved from this script's location (not cwd).
+// SEED_GUARD_TEST_ROOT overrides for testing only.
+const SCRIPT_PATH = path.dirname(fileURLToPath(import.meta.url));
+const ROOT_NAVI = process.env.SEED_GUARD_TEST_ROOT || path.resolve(SCRIPT_PATH, '..', '..');
+
+function confirmProduction(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (!process.stdin.isTTY) {
+      console.error('REFUSED: --allow-production requires an interactive TTY for confirmation.');
+      resolve(false);
+      return;
+    }
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.question('WARNING: You are about to write to PRODUCTION. Type "yes" to proceed: ', (ans) => {
+      rl.close();
+      resolve(ans.trim().toLowerCase() === 'yes');
+    });
+  });
+}
+
+async function assertNotProduction(env: Record<string, string>, allowProduction: boolean): Promise<void> {
   const targetUri = env.DATABASE_URI;
   if (!targetUri) throw new Error('DATABASE_URI not found in env file');
 
-  // Find root .env for comparison
-  const rootEnvPath = path.resolve(process.cwd(), '..', '.env');
-  if (!fs.existsSync(rootEnvPath)) return; // no root .env = can't compare
+  // Fail-closed: root .env must exist and be readable for endpoint comparison
+  const rootEnvPath = path.resolve(ROOT_NAVI, '.env');
+  if (!fs.existsSync(rootEnvPath)) {
+    throw new Error(
+      `REFUSED: production reference .env not found at ${rootEnvPath}.\n` +
+      'Cannot verify target is non-production. Fail-closed.'
+    );
+  }
 
   const rootEnv = readEnvFile(rootEnvPath);
   const prodUri = rootEnv.DATABASE_URI;
-  if (!prodUri) return;
+  if (!prodUri) {
+    throw new Error(
+      'REFUSED: root .env has no DATABASE_URI. Cannot verify target is non-production. Fail-closed.'
+    );
+  }
 
   if (endpointFingerprint(targetUri) === endpointFingerprint(prodUri)) {
     if (!allowProduction) {
@@ -225,15 +255,11 @@ function assertNotProduction(env: Record<string, string>, allowProduction: boole
         'Pass --allow-production and confirm interactively to override.'
       );
     }
-    // Interactive confirmation for production
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    const answer = rl.question('WARNING: You are about to write to PRODUCTION. Type "yes" to proceed: ', (ans) => {
-      rl.close();
-      if (ans.trim().toLowerCase() !== 'yes') {
-        console.error('Aborted.');
-        process.exit(1);
-      }
-    });
+    const confirmed = await confirmProduction();
+    if (!confirmed) {
+      console.error('Aborted.');
+      process.exit(1);
+    }
   }
 }
 
@@ -261,7 +287,7 @@ async function main() {
   const allowProduction = allowProdIdx !== -1;
 
   const env = readEnvFile(envFile);
-  assertNotProduction(env, allowProduction);
+  await assertNotProduction(env, allowProduction);
 
   // Set env vars for Payload init (no dotenv auto-load)
   process.env.DATABASE_URI = env.DATABASE_URI;
@@ -283,7 +309,7 @@ async function main() {
     const { docs: existing } = await payload.find({
       collection: 'pages',
       where: { pageKey: { equals: seed.pageKey } },
-      limit: 1,
+      limit: 2,
       overrideAccess: true,
       draft: true,
     });
