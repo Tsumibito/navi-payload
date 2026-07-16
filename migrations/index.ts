@@ -4,6 +4,6 @@ export const migrations = [
   {
     up: migration_20260716_081148_sprint3a_schema.up,
     down: migration_20260716_081148_sprint3a_schema.down,
-    name: '20260716_081148_sprint3a_schema'
+    name: '20260716_081148_sprint3a_schema',
   },
 ];

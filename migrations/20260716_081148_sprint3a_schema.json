@@ -956,7 +956,7 @@
         },
         "_locale": {
           "name": "_locale",
-          "type": "_locales",
+          "type": "varchar",
           "typeSchema": "navi",
           "primaryKey": false,
           "notNull": true
@@ -1407,7 +1407,7 @@
         },
         "_locale": {
           "name": "_locale",
-          "type": "_locales",
+          "type": "varchar",
           "typeSchema": "navi",
           "primaryKey": false,
           "notNull": true
@@ -1565,7 +1565,7 @@
         },
         "_locale": {
           "name": "_locale",
-          "type": "_locales",
+          "type": "varchar",
           "typeSchema": "navi",
           "primaryKey": false,
           "notNull": true
@@ -1982,7 +1982,7 @@
         },
         "_locale": {
           "name": "_locale",
-          "type": "_locales",
+          "type": "varchar",
           "typeSchema": "navi",
           "primaryKey": false,
           "notNull": true
@@ -2308,7 +2308,7 @@
         },
         "_locale": {
           "name": "_locale",
-          "type": "_locales",
+          "type": "varchar",
           "typeSchema": "navi",
           "primaryKey": false,
           "notNull": true
@@ -2724,7 +2724,7 @@
         },
         "_locale": {
           "name": "_locale",
-          "type": "_locales",
+          "type": "varchar",
           "typeSchema": "navi",
           "primaryKey": false,
           "notNull": true
@@ -3126,7 +3126,7 @@
         },
         "_locale": {
           "name": "_locale",
-          "type": "_locales",
+          "type": "varchar",
           "typeSchema": "navi",
           "primaryKey": false,
           "notNull": true
@@ -3444,7 +3444,7 @@
         },
         "_locale": {
           "name": "_locale",
-          "type": "_locales",
+          "type": "varchar",
           "typeSchema": "navi",
           "primaryKey": false,
           "notNull": true
@@ -3944,7 +3944,7 @@
         },
         "_locale": {
           "name": "_locale",
-          "type": "_locales",
+          "type": "varchar",
           "typeSchema": "navi",
           "primaryKey": false,
           "notNull": true
@@ -4204,7 +4204,7 @@
         },
         "_locale": {
           "name": "_locale",
-          "type": "_locales",
+          "type": "varchar",
           "typeSchema": "navi",
           "primaryKey": false,
           "notNull": true
@@ -4626,7 +4626,7 @@
         },
         "_locale": {
           "name": "_locale",
-          "type": "_locales",
+          "type": "varchar",
           "typeSchema": "navi",
           "primaryKey": false,
           "notNull": true
