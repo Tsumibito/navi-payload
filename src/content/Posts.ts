@@ -5,6 +5,7 @@ import { contentEditorFeatures, simpleEditorFeatures } from '../utils/lexicalCon
 import { createSeoField } from '../fields/seo';
 import { authenticated, ssgOrAuthenticated } from '../access/authenticated';
 import { createPublicSlugField } from '../fields/publicSlug';
+import { CONTENT_LOCALES } from '../config/contentLocales';
 
 const TEAM_RELATION = 'team-new' as unknown as CollectionSlug;
 const TAGS_RELATION = 'tags-new' as unknown as CollectionSlug;
@@ -47,12 +48,72 @@ export const Posts: CollectionConfig = {
         };
       },
     ],
+    afterChange: [
+      async ({ context, doc, previousDoc, req }) => {
+        if (context.skipLocalizationWorkflow || !doc.localizationWorkflow?.autoRun) return doc;
+        const sourceLocale = doc.localizationWorkflow.sourceLocale || req.locale || 'ru';
+        const targetLocales = doc.localizationWorkflow.targetLocales?.length
+          ? doc.localizationWorkflow.targetLocales
+          : CONTENT_LOCALES.map(({ code }) => code);
+        const watchedFields = ['name', 'content', 'summary', 'image'] as const;
+        const changedFields = !previousDoc || !previousDoc.localizationWorkflow?.autoRun
+          ? [...watchedFields]
+          : watchedFields.filter((field) => JSON.stringify(doc[field]) !== JSON.stringify(previousDoc[field]));
+        if (!changedFields.length) return doc;
+        await req.payload.jobs.queue({
+          task: 'localize-post' as never,
+          queue: 'content-localization',
+          input: { postId: doc.id, sourceLocale, targetLocales, changedFields } as never,
+        });
+        await req.payload.update({
+          collection: 'posts-new', id: doc.id, locale: sourceLocale,
+          context: { skipLocalizationWorkflow: true },
+          data: {
+            publicationStatus: doc.publicationStatus === 'published' ? 'published' : 'localizing',
+            localizationWorkflow: { ...doc.localizationWorkflow, state: 'queued', lastError: null },
+          },
+        });
+        return doc;
+      },
+    ],
   },
   fields: [
     createPublicSlugField(),
     {
+      type: 'select',
+      name: 'publicationStatus',
+      label: 'Publication status',
+      defaultValue: 'draft',
+      required: true,
+      options: [
+        { label: 'Draft', value: 'draft' },
+        { label: 'Localization in progress', value: 'localizing' },
+        { label: 'Editorial review', value: 'review' },
+        { label: 'Ready to publish', value: 'ready' },
+        { label: 'Published', value: 'published' },
+      ],
+      admin: { position: 'sidebar', description: 'Publishing is separate from saving. AI jobs never publish automatically.' },
+    },
+    {
       type: 'tabs',
       tabs: [
+        {
+          label: 'Localization workflow',
+          fields: [
+            {
+              type: 'group', name: 'localizationWorkflow', label: 'Automated localization', fields: [
+                { type: 'select', name: 'sourceLocale', label: 'Language this article was written in', required: true, defaultValue: 'ru', options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
+                { type: 'select', name: 'targetLocales', label: 'Languages to maintain', hasMany: true, defaultValue: CONTENT_LOCALES.map(({ code }) => code), options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
+                { type: 'checkbox', name: 'autoRun', label: 'Regenerate missing/outdated localized fields after save', defaultValue: false },
+                { type: 'select', name: 'state', label: 'Workflow state', defaultValue: 'idle', admin: { readOnly: true }, options: ['idle', 'queued', 'running', 'review', 'failed'].map((value) => ({ label: value, value })) },
+                { type: 'select', name: 'completedLocales', label: 'Completed locales', hasMany: true, admin: { readOnly: true }, options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
+                { type: 'date', name: 'lastCompletedAt', label: 'Last completed', admin: { readOnly: true } },
+                { type: 'textarea', name: 'lastError', label: 'Last error', admin: { readOnly: true } },
+                { type: 'json', name: 'linkPlan', label: 'Thematic internal-link plan', localized: true, admin: { readOnly: true, description: 'AI proposals: target, exact anchor, reason and section. Kept for editorial review before applying.' } },
+              ],
+            },
+          ],
+        },
         {
           label: 'Content',
           fields: [
@@ -87,6 +148,10 @@ export const Posts: CollectionConfig = {
               admin: {
                 description: 'Main post image',
               },
+            },
+            {
+              type: 'text', name: 'imageAlt', label: 'Featured image alt text', localized: true,
+              admin: { description: 'Generated per language, editable before publication.' },
             },
             {
               type: 'textarea',

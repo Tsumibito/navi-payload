@@ -17,6 +17,8 @@ import { SiteGlobals } from './globals/SiteGlobals'
 import { Redirects } from './collections/Redirects'
 import { Pages } from './content/Pages'
 import { env } from './config/env'
+import { CONTENT_LOCALES } from './config/contentLocales'
+import { localizePostTask } from './jobs/localizePost'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -43,7 +45,7 @@ export default buildConfig({
   // Нативная локализация Payload для новых коллекций (TagsNew и далее)
   // Старые коллекции (Tags, Posts и т.д.) продолжают использовать translations array
   localization: {
-    locales: ['ru', 'uk', 'en'],
+    locales: CONTENT_LOCALES.map(({ code, label }) => ({ code, label })),
     defaultLocale: 'ru',
     fallback: true,
   },
@@ -80,5 +82,10 @@ export default buildConfig({
   ],
   graphQL: {
     disable: true,
+  },
+  jobs: {
+    enableConcurrencyControl: true,
+    tasks: [localizePostTask],
+    autoRun: [{ cron: '* * * * *', queue: 'content-localization', limit: 1 }],
   },
 })

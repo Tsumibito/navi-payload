@@ -77,6 +77,7 @@ export interface Config {
     certificates: Certificate;
     trainings: Training;
     'payload-kv': PayloadKv;
+    'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -93,6 +94,7 @@ export interface Config {
     certificates: CertificatesSelect<false> | CertificatesSelect<true>;
     trainings: TrainingsSelect<false> | TrainingsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
+    'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -113,7 +115,13 @@ export interface Config {
   };
   user: User;
   jobs: {
-    tasks: unknown;
+    tasks: {
+      'localize-post': TaskLocalizePost;
+      inline: {
+        input: unknown;
+        output: unknown;
+      };
+    };
     workflows: unknown;
   };
 }
@@ -331,6 +339,31 @@ export interface PostsNew {
    */
   publicSlug?: string | null;
   /**
+   * Publishing is separate from saving. AI jobs never publish automatically.
+   */
+  publicationStatus: 'draft' | 'localizing' | 'review' | 'ready' | 'published';
+  localizationWorkflow: {
+    sourceLocale: 'ru' | 'uk' | 'en';
+    targetLocales?: ('ru' | 'uk' | 'en')[] | null;
+    autoRun?: boolean | null;
+    state?: ('idle' | 'queued' | 'running' | 'review' | 'failed') | null;
+    completedLocales?: ('ru' | 'uk' | 'en')[] | null;
+    lastCompletedAt?: string | null;
+    lastError?: string | null;
+    /**
+     * AI proposals: target, exact anchor, reason and section. Kept for editorial review before applying.
+     */
+    linkPlan?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+  };
+  /**
    * Post title (localized)
    */
   name?: string | null;
@@ -342,6 +375,10 @@ export interface PostsNew {
    * Main post image
    */
   image?: (number | null) | Media;
+  /**
+   * Generated per language, editable before publication.
+   */
+  imageAlt?: string | null;
   /**
    * 1–2 sentence overview (localized)
    */
@@ -978,6 +1015,102 @@ export interface PayloadKv {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs".
+ */
+export interface PayloadJob {
+  id: number;
+  /**
+   * Input data provided to the job
+   */
+  input?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  taskStatus?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  completedAt?: string | null;
+  totalTried?: number | null;
+  /**
+   * If hasError is true this job will not be retried
+   */
+  hasError?: boolean | null;
+  /**
+   * If hasError is true, this is the error that caused it
+   */
+  error?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Task execution log
+   */
+  log?:
+    | {
+        executedAt: string;
+        completedAt: string;
+        taskSlug: 'inline' | 'localize-post';
+        taskID: string;
+        input?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        output?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        state: 'failed' | 'succeeded';
+        error?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  taskSlug?: ('inline' | 'localize-post') | null;
+  queue?: string | null;
+  waitUntil?: string | null;
+  processing?: boolean | null;
+  /**
+   * Used for concurrency control. Jobs with the same key are subject to exclusive/supersedes rules.
+   */
+  concurrencyKey?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-locked-documents".
  */
 export interface PayloadLockedDocument {
@@ -1202,9 +1335,23 @@ export interface PagesSelect<T extends boolean = true> {
  */
 export interface PostsNewSelect<T extends boolean = true> {
   publicSlug?: T;
+  publicationStatus?: T;
+  localizationWorkflow?:
+    | T
+    | {
+        sourceLocale?: T;
+        targetLocales?: T;
+        autoRun?: T;
+        state?: T;
+        completedLocales?: T;
+        lastCompletedAt?: T;
+        lastError?: T;
+        linkPlan?: T;
+      };
   name?: T;
   slug?: T;
   image?: T;
+  imageAlt?: T;
   summary?: T;
   content?: T;
   authors?: T;
@@ -1396,6 +1543,38 @@ export interface PayloadKvSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs_select".
+ */
+export interface PayloadJobsSelect<T extends boolean = true> {
+  input?: T;
+  taskStatus?: T;
+  completedAt?: T;
+  totalTried?: T;
+  hasError?: T;
+  error?: T;
+  log?:
+    | T
+    | {
+        executedAt?: T;
+        completedAt?: T;
+        taskSlug?: T;
+        taskID?: T;
+        input?: T;
+        output?: T;
+        state?: T;
+        error?: T;
+        id?: T;
+      };
+  taskSlug?: T;
+  queue?: T;
+  waitUntil?: T;
+  processing?: T;
+  concurrencyKey?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-locked-documents_select".
  */
 export interface PayloadLockedDocumentsSelect<T extends boolean = true> {
@@ -1515,6 +1694,20 @@ export interface CollectionsWidget {
     [k: string]: unknown;
   };
   width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskLocalize-post".
+ */
+export interface TaskLocalizePost {
+  input: {
+    postId: number;
+    sourceLocale: 'ru' | 'uk' | 'en';
+    targetLocales: ('ru' | 'uk' | 'en')[];
+  };
+  output: {
+    completedLocales?: ('ru' | 'uk' | 'en')[] | null;
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
