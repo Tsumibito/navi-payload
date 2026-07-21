@@ -54,11 +54,6 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   ALTER TABLE "navi"."pages_locales" ADD COLUMN "seo_json_ld" varchar;
   ALTER TABLE "navi"."_pages_v_locales" ADD COLUMN "version_seo_json_ld" varchar;
   ALTER TABLE "navi"."posts_new_locales" ADD COLUMN "localization_workflow_inbound_link_plan" jsonb;
-  ALTER TABLE "navi"."posts_new_locales" ADD COLUMN "seo_json_ld" varchar;
-  ALTER TABLE "navi"."tags_new_locales" ADD COLUMN "seo_json_ld" varchar;
-  ALTER TABLE "navi"."team_new_locales" ADD COLUMN "seo_json_ld" varchar;
-  ALTER TABLE "navi"."certificates_new_locales" ADD COLUMN "seo_json_ld" varchar;
-  ALTER TABLE "navi"."trainings_new_locales" ADD COLUMN "seo_json_ld" varchar;
   ALTER TABLE "navi"."_trainings_new_v_locales" ADD COLUMN "version_seo_json_ld" varchar;
   ALTER TABLE "navi"."payload_locked_documents_rels" ADD COLUMN "glossary_terms_id" integer;
   ALTER TABLE "navi"."glossary_terms_translations_aliases" ADD CONSTRAINT "glossary_terms_translations_aliases_parent_id_fk" FOREIGN KEY ("_parent_id") REFERENCES "navi"."glossary_terms_translations"("id") ON DELETE cascade ON UPDATE no action;
@@ -112,11 +107,6 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
   ALTER TABLE "navi"."pages_locales" DROP COLUMN "seo_json_ld";
   ALTER TABLE "navi"."_pages_v_locales" DROP COLUMN "version_seo_json_ld";
   ALTER TABLE "navi"."posts_new_locales" DROP COLUMN "localization_workflow_inbound_link_plan";
-  ALTER TABLE "navi"."posts_new_locales" DROP COLUMN "seo_json_ld";
-  ALTER TABLE "navi"."tags_new_locales" DROP COLUMN "seo_json_ld";
-  ALTER TABLE "navi"."team_new_locales" DROP COLUMN "seo_json_ld";
-  ALTER TABLE "navi"."certificates_new_locales" DROP COLUMN "seo_json_ld";
-  ALTER TABLE "navi"."trainings_new_locales" DROP COLUMN "seo_json_ld";
   ALTER TABLE "navi"."_trainings_new_v_locales" DROP COLUMN "version_seo_json_ld";
   ALTER TABLE "navi"."payload_locked_documents_rels" DROP COLUMN "glossary_terms_id";
   DROP TYPE "navi"."enum_glossary_terms_translations_status";
