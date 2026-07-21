@@ -368,6 +368,7 @@ export const localizePostTask: TaskConfig<any> = {
     { name: 'targetLocales', type: 'select', hasMany: true, required: true, options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
     { name: 'changedFields', type: 'select', hasMany: true, required: true, options: ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags', 'publicationStatus'].map((value) => ({ label: value, value })) },
     { name: 'stages', type: 'select', hasMany: true, options: ['source-editorial', 'translations', 'taxonomy-links', 'image'].map((value) => ({ label: value, value })) },
+    { name: 'fieldScope', type: 'select', options: ['all', 'seo', 'faq', 'alt'].map((value) => ({ label: value, value })) },
   ],
   outputSchema: [
     { name: 'completedLocales', type: 'select', hasMany: true, options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
@@ -384,6 +385,7 @@ export const localizePostTask: TaskConfig<any> = {
     const targets = [...new Set((input.targetLocales || []).filter((locale: string) => locale !== sourceLocale))] as ContentLocale[]
     const changed = new Set(input.changedFields || ['name', 'content', 'summary', 'image'])
     const stages = new Set(input.stages?.length ? input.stages : ['source-editorial', 'translations', 'taxonomy-links', 'image'])
+    const fieldScope = (input.fieldScope || 'all') as 'all' | 'seo' | 'faq' | 'alt'
     const runSourceEditorial = stages.has('source-editorial')
     const runTranslations = stages.has('translations')
     const runTaxonomyLinks = stages.has('taxonomy-links')
@@ -413,24 +415,26 @@ export const localizePostTask: TaskConfig<any> = {
     }
     const sourceGlossary = await loadApprovedGlossary(req.payload, source.content, sourceLocale, sourceLocale)
 
-    const sourceEditorial = runSourceEditorial
+    const sourceEditorial = runSourceEditorial && fieldScope !== 'faq'
       ? await generateEditorialFields({ content: source.content, locale: sourceLocale, name: source.name, summary: source.summary, glossary: sourceGlossary })
       : { summary: source.summary, seoTitle: source.seo?.title, metaDescription: source.seo?.meta_description, focusKeyphrase: source.seo?.focus_keyphrase, imageAlt: source.imageAlt }
-    const sourceFAQs = runSourceEditorial || (runTranslations && !(source.faqs || []).length)
+    const sourceFAQs = (runSourceEditorial && (fieldScope === 'all' || fieldScope === 'faq')) || (runTranslations && !(source.faqs || []).length)
       ? await generateFAQs(source.content, sourceLocale, sourceGlossary)
       : (source.faqs || [])
     const sourceLinkPlan = runTaxonomyLinks ? await generateLinkPlan(req.payload, source, sourceLocale) : (source.localizationWorkflow?.linkPlan || [])
     const sourceInboundLinkPlan = runTaxonomyLinks ? await generateInboundLinkPlan(req.payload, source, sourceLocale) : (source.localizationWorkflow?.inboundLinkPlan || [])
     if (runTaxonomyLinks && source.publicationStatus === 'published') await applyInboundLinks(req.payload, sourceInboundLinkPlan, sourceLocale)
     const sourceContent = runTaxonomyLinks ? applyLinkPlan(source.content, sourceLinkPlan) : source.content
-    if (runSourceEditorial) assertLocalizedResult({ locale: sourceLocale, post: { ...source, content: sourceContent }, editorial: sourceEditorial, faqs: sourceFAQs, linkPlan: sourceLinkPlan })
+    if (runSourceEditorial && fieldScope === 'all') assertLocalizedResult({ locale: sourceLocale, post: { ...source, content: sourceContent }, editorial: sourceEditorial, faqs: sourceFAQs, linkPlan: sourceLinkPlan })
     const sourceJSONLD = buildJSONLD({ ...source, content: sourceContent }, sourceLocale, sourceEditorial, sourceFAQs)
     await req.payload.update({
       collection: 'posts-new', id: source.id, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
       data: {
-        ...(runSourceEditorial ? { summary: sourceEditorial.summary || source.summary, faqs: sourceFAQs, imageAlt: sourceEditorial.imageAlt } : {}),
+        ...(runSourceEditorial && fieldScope === 'all' ? { summary: sourceEditorial.summary || source.summary } : {}),
+        ...(runSourceEditorial && (fieldScope === 'all' || fieldScope === 'faq') ? { faqs: sourceFAQs } : {}),
+        ...(runSourceEditorial && (fieldScope === 'all' || fieldScope === 'alt') ? { imageAlt: sourceEditorial.imageAlt } : {}),
         content: sourceContent,
-        ...((runSourceEditorial || runTaxonomyLinks) ? { seo: { ...(source.seo || {}), title: sourceEditorial.seoTitle, meta_description: sourceEditorial.metaDescription, focus_keyphrase: sourceEditorial.focusKeyphrase, link_keywords: sourceLinkPlan.map((link: any) => `${link.anchor} -> ${link.url}`).join('\n'), json_ld: sourceJSONLD } } : {}),
+        ...((runTaxonomyLinks || (runSourceEditorial && ['all', 'seo', 'faq'].includes(fieldScope))) ? { seo: { ...(source.seo || {}), title: sourceEditorial.seoTitle, meta_description: sourceEditorial.metaDescription, focus_keyphrase: sourceEditorial.focusKeyphrase, link_keywords: sourceLinkPlan.map((link: any) => `${link.anchor} -> ${link.url}`).join('\n'), json_ld: sourceJSONLD } } : {}),
         localizationWorkflow: { ...(source.localizationWorkflow || {}), linkPlan: sourceLinkPlan, inboundLinkPlan: sourceInboundLinkPlan },
       },
     })

@@ -1,11 +1,21 @@
+const isBuild = process.env.PAYLOAD_BUILD === '1'
+const buildValues: Record<string, string> = {
+  PAYLOAD_SECRET: 'build-only', PAYLOAD_SSG_API_KEY: 'build-only',
+  DATABASE_URI: 'postgresql://build:build@127.0.0.1:5432/build',
+  CLOUDFLARE_R2_ACCESS_KEY_ID: 'build-only', CLOUDFLARE_R2_SECRET_ACCESS_KEY: 'build-only',
+  CLOUDFLARE_R2_BUCKET_NAME: 'build-only', CLOUDFLARE_R2_ENDPOINT: 'https://example.invalid',
+  CLOUDFLARE_R2_PUBLIC_URL: 'https://example.invalid', PAYLOAD_PUBLIC_SERVER_URL: 'http://localhost:3000',
+}
+
 const required = (name: string): string => {
+  if (isBuild && buildValues[name]) return buildValues[name]
   const value = process.env[name]?.trim()
   if (!value) throw new Error(`Missing required environment variable: ${name}`)
   return value
 }
 
 const url = (name: string, fallback?: string): string => {
-  const value = process.env[name]?.trim() || fallback
+  const value = (isBuild ? buildValues[name] : undefined) || process.env[name]?.trim() || fallback
   if (!value) throw new Error(`Missing required environment variable: ${name}`)
   try {
     return new URL(value).toString().replace(/\/$/, '')

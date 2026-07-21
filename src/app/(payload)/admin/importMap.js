@@ -26,8 +26,11 @@ import { FocusKeyphraseAnalyzer as FocusKeyphraseAnalyzer_428f656e50e600e9ec2123
 import { SeoKeywordManager as SeoKeywordManager_462b8dacad1901b9c82d0b9600d432a4 } from '../../../../src/components/SeoKeywordManager'
 import { EditorialWorkflowButton as EditorialWorkflowButton_343be80d4b57a314839e3f92ff0dba96 } from '../../../../src/components/EditorialWorkflowButton'
 import { GenerateSlugButton as GenerateSlugButton_68a79d9f857f4400dd1a5091bb544cf7 } from '../../../../src/components/GenerateSlugButton'
+import { GenerateImageAltButton as GenerateImageAltButton_9fc8e6b15e5f66bee095735f06ab4344 } from '../../../../src/components/EditorialFieldActions'
 import { GenerateSummaryButton as GenerateSummaryButton_8f650de01469eb4d0811a209b22855c9 } from '../../../../src/components/GenerateSummaryButton'
 import { DefineTagsButton as DefineTagsButton_3f6daf68463bf4647f221b892f000bd2 } from '../../../../src/components/DefineTagsButton'
+import { GenerateSeoFieldsButton as GenerateSeoFieldsButton_9fc8e6b15e5f66bee095735f06ab4344 } from '../../../../src/components/EditorialFieldActions'
+import { GenerateFaqFieldsButton as GenerateFaqFieldsButton_9fc8e6b15e5f66bee095735f06ab4344 } from '../../../../src/components/EditorialFieldActions'
 import { AIFaqGeneratorButton as AIFaqGeneratorButton_989aa69d921d544baad3872686b8d37d } from '../../../../src/components/AIFaqGeneratorButton'
 import { S3ClientUploadHandler as S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24 } from '@payloadcms/storage-s3/client'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
@@ -62,8 +65,11 @@ export const importMap = {
   "/src/components/SeoKeywordManager#SeoKeywordManager": SeoKeywordManager_462b8dacad1901b9c82d0b9600d432a4,
   "/src/components/EditorialWorkflowButton#EditorialWorkflowButton": EditorialWorkflowButton_343be80d4b57a314839e3f92ff0dba96,
   "/src/components/GenerateSlugButton#GenerateSlugButton": GenerateSlugButton_68a79d9f857f4400dd1a5091bb544cf7,
+  "/src/components/EditorialFieldActions#GenerateImageAltButton": GenerateImageAltButton_9fc8e6b15e5f66bee095735f06ab4344,
   "/src/components/GenerateSummaryButton#GenerateSummaryButton": GenerateSummaryButton_8f650de01469eb4d0811a209b22855c9,
   "/src/components/DefineTagsButton#DefineTagsButton": DefineTagsButton_3f6daf68463bf4647f221b892f000bd2,
+  "/src/components/EditorialFieldActions#GenerateSeoFieldsButton": GenerateSeoFieldsButton_9fc8e6b15e5f66bee095735f06ab4344,
+  "/src/components/EditorialFieldActions#GenerateFaqFieldsButton": GenerateFaqFieldsButton_9fc8e6b15e5f66bee095735f06ab4344,
   "/src/components/AIFaqGeneratorButton#AIFaqGeneratorButton": AIFaqGeneratorButton_989aa69d921d544baad3872686b8d37d,
   "@payloadcms/storage-s3/client#S3ClientUploadHandler": S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1

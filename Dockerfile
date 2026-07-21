@@ -13,17 +13,10 @@ RUN --mount=type=cache,target=/root/.npm \
 
 COPY . .
 ENV NODE_ENV=production
-# Next imports the Payload configuration while compiling. Real production
-# credentials are never needed at this stage; they are decrypted only when the
-# container starts. These placeholders exist for config validation during build.
-RUN PAYLOAD_SECRET=build-only-placeholder-not-used-at-runtime \
-  PAYLOAD_SSG_API_KEY=build-only-placeholder-not-used-at-runtime \
-  DATABASE_URI=postgresql://build:build@127.0.0.1:5432/build \
-  CLOUDFLARE_R2_ACCESS_KEY_ID=build-placeholder \
-  CLOUDFLARE_R2_SECRET_ACCESS_KEY=build-placeholder \
-  CLOUDFLARE_R2_BUCKET_NAME=build-placeholder \
-  CLOUDFLARE_R2_ENDPOINT=https://example.invalid \
-  npm run build
+# Payload config is imported at compile time, but build never needs production
+# credentials. The config supplies inert values only while PAYLOAD_BUILD is set.
+ENV PAYLOAD_BUILD=1
+RUN npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app

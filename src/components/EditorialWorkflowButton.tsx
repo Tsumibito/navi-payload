@@ -13,12 +13,19 @@ const actions: Array<{ action: Action; eyebrow: string; title: string; text: str
 ]
 
 export function EditorialWorkflowButton() {
-  const { id } = useDocumentInfo()
+  const documentInfo = useDocumentInfo()
+  const { id } = documentInfo
   const { submit } = useForm()
   const [active, setActive] = useState<Action | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [status, setStatus] = useState<Status>({})
+  const currentLocale = (() => {
+    const fromInfo = (documentInfo as any)?.locale?.code || (documentInfo as any)?.localeCode || (documentInfo as any)?.locale
+    const fromURL = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('locale') : null
+    const value = String(fromURL || fromInfo || 'ru').toLowerCase()
+    return value === 'ua' ? 'uk' : value
+  })()
 
   const refresh = useCallback(async () => {
     if (!id) return
@@ -40,10 +47,11 @@ export function EditorialWorkflowButton() {
       const saved = await submit()
       if (saved && !saved.res.ok) throw new Error('Не удалось сохранить запись')
       setMessage(action === 'publish' ? 'Проверяю готовность…' : 'Ставлю задачу в очередь…')
-      const response = await fetch('/api/editorial-workflow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postId: id, action }) })
+      const response = await fetch('/api/editorial-workflow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postId: id, action, locale: currentLocale }) })
       const body = await response.json()
       if (!response.ok) throw new Error([body.error, ...(body.errors || [])].filter(Boolean).join(' · '))
-      setMessage(action === 'publish' ? 'Статья опубликована.' : 'Задача запущена. Можно продолжать редактирование — результат появится после обработки.')
+      setMessage(body.completed ? 'Поля записаны. Обновляю форму…' : action === 'publish' ? 'Статья опубликована.' : 'Задача запущена. Результат появится после обработки.')
+      if (body.completed) { window.location.reload(); return }
       await refresh()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Не удалось выполнить действие')

@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server'
 
 import { authenticatePayloadRequest, unauthorizedResponse } from '@/utils/authenticatedPayload'
 import { generateSlug } from '@/utils/slug'
+import { localizePostTask } from '@/jobs/localizePost'
 
 const DEFAULT_IMAGE_PROMPT = 'Photorealistic editorial hero image for a professional sailing article. Accurate modern yacht equipment and realistic seamanship context, natural light, clean 16:9 composition, no logos, brands, watermarks or readable interface text.'
-type Action = 'editorial' | 'translations' | 'taxonomy' | 'image' | 'full' | 'publish'
-const ACTION_STAGES: Record<Exclude<Action, 'publish'>, string[]> = {
+type Action = 'editorial' | 'seo' | 'faq' | 'alt' | 'translations' | 'taxonomy' | 'image' | 'full' | 'publish'
+const ACTION_STAGES: Record<'editorial' | 'translations' | 'taxonomy' | 'image' | 'full', string[]> = {
   editorial: ['source-editorial'], translations: ['translations'], taxonomy: ['taxonomy-links'], image: ['image'],
   full: ['source-editorial', 'translations', 'taxonomy-links', 'image'],
 }
@@ -38,9 +39,9 @@ export async function POST(request: Request) {
   const auth = await authenticatePayloadRequest(request)
   if (!auth) return unauthorizedResponse()
   try {
-    const { postId, action = 'full' } = await request.json() as { postId?: number | string; action?: Action }
+    const { postId, action = 'full', locale: requestedLocale } = await request.json() as { postId?: number | string; action?: Action; locale?: string }
     if (!postId) return NextResponse.json({ error: 'postId is required' }, { status: 400 })
-    if (!['editorial', 'translations', 'taxonomy', 'image', 'full', 'publish'].includes(action)) return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
+    if (!['editorial', 'seo', 'faq', 'alt', 'translations', 'taxonomy', 'image', 'full', 'publish'].includes(action)) return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
     const { payload } = auth
     let post = await payload.findByID({ collection: 'posts-new', id: postId, locale: 'uk', fallbackLocale: false, depth: 0 }) as any
 
@@ -55,7 +56,11 @@ export async function POST(request: Request) {
       })
     }
 
-    const sourceLocale = String(postId) === '27' ? 'uk' : (post.localizationWorkflow?.sourceLocale || 'uk')
+    const normalizedRequestedLocale = requestedLocale === 'ua' ? 'uk' : requestedLocale
+    const configuredSourceLocale = String(postId) === '27' ? 'uk' : (post.localizationWorkflow?.sourceLocale || 'uk')
+    const sourceLocale = ['editorial', 'seo', 'faq', 'alt', 'taxonomy'].includes(action) && ['ru', 'uk', 'en'].includes(normalizedRequestedLocale || '')
+      ? normalizedRequestedLocale as 'ru' | 'uk' | 'en'
+      : configuredSourceLocale
     const source = sourceLocale === 'uk' ? post : await payload.findByID({ collection: 'posts-new', id: postId, locale: sourceLocale, fallbackLocale: false, depth: 0 }) as any
     if (!source.name || !source.content) return NextResponse.json({ error: `Source locale ${sourceLocale} has no title or content` }, { status: 400 })
     if (action === 'publish') {
@@ -74,10 +79,19 @@ export async function POST(request: Request) {
       collection: 'posts-new', id: postId, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
       data: { publicationStatus: action === 'full' ? 'localizing' : 'review', localizationWorkflow: workflow },
     })
+    const stages = ['seo', 'faq', 'alt'].includes(action) ? ['source-editorial'] : ACTION_STAGES[action as keyof typeof ACTION_STAGES]
+    const fieldScope = ['seo', 'faq', 'alt'].includes(action) ? action : 'all'
+    const taskInput = { postId: Number(postId), sourceLocale, targetLocales: ['uk', 'ru', 'en'], changedFields: ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags'], stages, fieldScope }
+    if (['editorial', 'seo', 'faq', 'alt', 'taxonomy', 'image'].includes(action)) {
+      const handler = localizePostTask.handler as any
+      await handler({ input: taskInput, req: { payload } })
+      return NextResponse.json({ completed: true, postId, sourceLocale, action })
+    }
     const job = await payload.jobs.queue({
       task: 'localize-post' as never, queue: 'content-localization',
-      input: { postId: Number(postId), sourceLocale, targetLocales: ['uk', 'ru', 'en'], changedFields: ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags'], stages: ACTION_STAGES[action] } as never,
+      input: taskInput as never,
     })
+    void payload.jobs.run({ queue: 'content-localization', limit: 1 }).catch((error) => payload.logger.error({ err: error }, 'Editorial worker failed'))
     return NextResponse.json({ queued: true, jobId: (job as any)?.id, postId, sourceLocale, action })
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Workflow failed to start' }, { status: 500 })

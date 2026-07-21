@@ -162,7 +162,7 @@ export const Posts: CollectionConfig = {
             },
             {
               type: 'text', name: 'imageAlt', label: 'Featured image alt text', localized: true,
-              admin: { description: 'Generated per language, editable before publication.' },
+              admin: { description: 'Generated per language, editable before publication.', components: { afterInput: ['/src/components/EditorialFieldActions#GenerateImageAltButton'] } },
             },
             {
               type: 'textarea',
@@ -263,18 +263,20 @@ export const Posts: CollectionConfig = {
         },
         {
           label: 'SEO',
-          fields: [createSeoField({ localized: true })],
+          fields: [
+            { type: 'ui', name: 'generateSeoFields', admin: { components: { Field: '/src/components/EditorialFieldActions#GenerateSeoFieldsButton' } } },
+            createSeoField({ localized: true }),
+          ],
         },
         {
           label: 'FAQs',
           fields: [
-            // ✨ AI FAQ Generator Button
             {
               type: 'ui',
               name: 'aiFaqGenerator',
               admin: {
                 components: {
-                  Field: '/src/components/AIFaqGeneratorButton#AIFaqGeneratorButton',
+                  Field: '/src/components/EditorialFieldActions#GenerateFaqFieldsButton',
                 },
               },
             },

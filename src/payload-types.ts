@@ -77,6 +77,7 @@ export interface Config {
     certificates: Certificate;
     trainings: Training;
     'glossary-terms': GlossaryTerm;
+    leads: Lead;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
@@ -95,6 +96,7 @@ export interface Config {
     certificates: CertificatesSelect<false> | CertificatesSelect<true>;
     trainings: TrainingsSelect<false> | TrainingsSelect<true>;
     'glossary-terms': GlossaryTermsSelect<false> | GlossaryTermsSelect<true>;
+    leads: LeadsSelect<false> | LeadsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -1106,6 +1108,28 @@ export interface GlossaryTerm {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "leads".
+ */
+export interface Lead {
+  id: number;
+  email: string;
+  kind: 'newsletter' | 'contact';
+  status: 'new' | 'contacted' | 'subscribed' | 'unsubscribed';
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  message?: string | null;
+  locale?: string | null;
+  sourceUrl?: string | null;
+  utm?: string | null;
+  ip?: string | null;
+  userAgent?: string | null;
+  consentAt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -1263,6 +1287,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'glossary-terms';
         value: number | GlossaryTerm;
+      } | null)
+    | ({
+        relationTo: 'leads';
+        value: number | Lead;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -1709,6 +1737,27 @@ export interface GlossaryTermsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "leads_select".
+ */
+export interface LeadsSelect<T extends boolean = true> {
+  email?: T;
+  kind?: T;
+  status?: T;
+  firstName?: T;
+  lastName?: T;
+  phone?: T;
+  message?: T;
+  locale?: T;
+  sourceUrl?: T;
+  utm?: T;
+  ip?: T;
+  userAgent?: T;
+  consentAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv_select".
  */
 export interface PayloadKvSelect<T extends boolean = true> {
@@ -1880,6 +1929,7 @@ export interface TaskLocalizePost {
     targetLocales: ('ru' | 'uk' | 'en')[];
     changedFields: ('name' | 'content' | 'summary' | 'image' | 'faqs' | 'authors' | 'tags' | 'publicationStatus')[];
     stages?: ('source-editorial' | 'translations' | 'taxonomy-links' | 'image')[] | null;
+    fieldScope?: ('all' | 'seo' | 'faq' | 'alt') | null;
   };
   output: {
     completedLocales?: ('ru' | 'uk' | 'en')[] | null;
