@@ -110,6 +110,7 @@ export const createSeoField = (
       type: 'code',
       name: 'json_ld',
       label: 'JSON-LD',
+      ...(localizedProps ?? {}),
       admin: {
         language: 'json',
         description: 'Структурированные данные Schema.org в формате JSON-LD. Будет автоматически обернут в <script type="application/ld+json">',

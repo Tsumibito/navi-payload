@@ -33,4 +33,6 @@ Add one entry to `src/config/contentLocales.ts` and redeploy/migrate Payload. Th
 
 Payload's durable Jobs Queue runs one localization job at a time every minute. Each job retries twice, and concurrency is keyed by post ID. This avoids blocking the admin save request and prevents simultaneous translations from overwriting one another.
 
-Production must provide only the secret `OPENROUTER_TOKEN`. The non-secret localization model is configured in code as `openai/gpt-5.6-luna`.
+The job translates the title, Lexical body, summary, featured-image alt text and FAQs with the sailing glossary. It generates localized SEO title, meta description, focus keyphrase, BlogPosting/FAQPage JSON-LD, and a 2–6 link topic-cluster plan. Valid exact-match anchors are inserted into the Lexical article and target existing frozen routes; the Astro SSG route registry performs the final legacy-route rewrite. Existing internal links are moved to the target language prefix. Only published posts can be selected as link targets. Every run stops at editorial review and never publishes automatically.
+
+Production must provide the secret `OPENROUTER_TOKEN`. The non-secret `OPENROUTER_LOCALIZATION_MODEL` is a normal runtime setting and defaults to `openai/gpt-5.6-luna`.

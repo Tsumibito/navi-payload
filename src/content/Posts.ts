@@ -55,7 +55,7 @@ export const Posts: CollectionConfig = {
         const targetLocales = doc.localizationWorkflow.targetLocales?.length
           ? doc.localizationWorkflow.targetLocales
           : CONTENT_LOCALES.map(({ code }) => code);
-        const watchedFields = ['name', 'content', 'summary', 'image'] as const;
+        const watchedFields = ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags'] as const;
         const changedFields = !previousDoc || !previousDoc.localizationWorkflow?.autoRun
           ? [...watchedFields]
           : watchedFields.filter((field) => JSON.stringify(doc[field]) !== JSON.stringify(previousDoc[field]));
