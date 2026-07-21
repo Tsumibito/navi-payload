@@ -4,6 +4,8 @@ import { CONTENT_LOCALES, type ContentLocale, YACHTING_GLOSSARY } from '../confi
 import { generateSlug } from '../utils/slug'
 
 type LexicalNode = { type?: string; text?: string; children?: LexicalNode[]; [key: string]: unknown }
+type GlossaryTranslation = { locale?: string; term?: string; aliases?: Array<{ value?: string }>; definition?: string; usageNotes?: string; forbiddenVariants?: Array<{ value?: string }>; status?: string }
+const GLOSSARY_DOMAINS = new Set(['general', 'sailing', 'navigation', 'meteorology', 'safety', 'radio', 'rigging', 'boatbuilding', 'racing', 'charter', 'certification'])
 
 const OPENROUTER_LOCALIZATION_MODEL = process.env.OPENROUTER_LOCALIZATION_MODEL?.trim() || 'openai/gpt-5.6-luna'
 
@@ -44,13 +46,13 @@ function collectTextNodes(value: unknown, result: Array<{ id: string; node: Lexi
   return result
 }
 
-async function translateLexical(content: unknown, source: ContentLocale, target: ContentLocale): Promise<unknown> {
+async function translateLexical(content: unknown, source: ContentLocale, target: ContentLocale, glossary = ''): Promise<unknown> {
   const clone = structuredClone(content)
   const nodes = collectTextNodes(clone)
   for (let offset = 0; offset < nodes.length; offset += 35) {
     const batch = nodes.slice(offset, offset + 35)
     const translated = await openRouterJSON(
-      `You are a professional sailing editor. Translate from ${source} to ${target}. ${YACHTING_GLOSSARY} Return only JSON {"items":{"id":"translation"}}. Preserve meaning, punctuation and inline spacing.`,
+      `You are a professional sailing editor. Translate from ${source} to ${target}. ${YACHTING_GLOSSARY}\n${glossary} Return only JSON {"items":{"id":"translation"}}. Preserve meaning, punctuation and inline spacing.`,
       JSON.stringify({ items: Object.fromEntries(batch.map(({ id, node }) => [id, node.text])) }),
     )
     for (const { id, node } of batch) {
@@ -84,10 +86,10 @@ function localizeInternalURLs(content: unknown, target: ContentLocale): unknown 
   return clone
 }
 
-async function generateEditorialFields(args: { content: unknown; locale: ContentLocale; name: string; summary?: string }) {
+async function generateEditorialFields(args: { content: unknown; locale: ContentLocale; name: string; summary?: string; glossary?: string }) {
   const plainText = collectTextNodes(structuredClone(args.content)).map(({ node }) => node.text).join(' ').slice(0, 24_000)
   return openRouterJSON(
-    `You are an SEO editor for a professional sailing school. Write in ${args.locale}. ${YACHTING_GLOSSARY} Return JSON with title, summary, seoTitle, metaDescription, focusKeyphrase, imageAlt. SEO title 45-60 characters; description 135-160 characters; no keyword stuffing.`,
+    `You are an SEO editor for a professional sailing school. Write in ${args.locale}. ${YACHTING_GLOSSARY}\n${args.glossary || ''} Return JSON with title, summary, seoTitle, metaDescription, focusKeyphrase, imageAlt. SEO title 45-60 characters; description 135-160 characters; no keyword stuffing.`,
     JSON.stringify({ title: args.name, currentSummary: args.summary, article: plainText }),
   )
 }
@@ -112,6 +114,45 @@ async function generateLinkPlan(payload: any, post: any, locale: ContentLocale) 
     if (!target || !slug || typeof link.anchor !== 'string') return []
     return [{ ...link, targetId: target.id, url: `/${prefix}/blog/${slug}/` }]
   }).slice(0, 6)
+}
+
+async function generateInboundLinkPlan(payload: any, target: any, locale: ContentLocale) {
+  const tagIds = (target.tags || []).map((tag: any) => typeof tag === 'object' ? tag.value?.id || tag.id || tag.value : tag)
+  if (!tagIds.length) return []
+  const candidates = await payload.find({
+    collection: 'posts-new', locale, fallbackLocale: false, depth: 0, limit: 18,
+    where: { and: [{ id: { not_equals: target.id } }, { publicationStatus: { equals: 'published' } }, { tags: { in: tagIds } }] },
+  })
+  const prefix = locale === 'uk' ? 'ua' : locale
+  const targetSlug = target.publicSlug || target.slug
+  if (!targetSlug) return []
+  const targetURL = `/${prefix}/blog/${targetSlug}/`
+  const sources = candidates.docs.flatMap((doc: any) => {
+    const text = lexicalPlainText(doc.content)
+    if (!text || JSON.stringify(doc.content).includes(targetURL)) return []
+    return [{ id: doc.id, title: doc.name, summary: doc.summary, article: text.slice(0, 7_000) }]
+  })
+  if (!sources.length) return []
+  const response = await openRouterJSON(
+    `Select 2-5 published sailing articles that should link to the new target article. For every source choose one exact natural anchor phrase already present verbatim in that source article. The link must add genuine topical value and be distributed across the cluster. Return JSON {"links":[{"sourcePostId":1,"anchor":"exact phrase","reason":"..."}]}.`,
+    JSON.stringify({ target: { title: target.name, summary: target.summary, url: targetURL }, sources }),
+  )
+  const byId = new Map(candidates.docs.map((doc: any) => [String(doc.id), doc]))
+  return (Array.isArray(response.links) ? response.links : []).flatMap((link: any) => {
+    const source: any = byId.get(String(link.sourcePostId))
+    if (!source || typeof link.anchor !== 'string' || !lexicalPlainText(source.content).includes(link.anchor)) return []
+    return [{ ...link, sourcePostId: source.id, sourceTitle: source.name, url: targetURL }]
+  }).slice(0, 5)
+}
+
+async function applyInboundLinks(payload: any, plan: any[], locale: ContentLocale) {
+  for (const link of plan) {
+    const source = await payload.findByID({ collection: 'posts-new', id: link.sourcePostId, locale, fallbackLocale: false, depth: 0 })
+    if (!source?.content || JSON.stringify(source.content).includes(link.url)) continue
+    const content = applyLinkPlan(source.content, [{ anchor: link.anchor, url: link.url }])
+    if (JSON.stringify(content) === JSON.stringify(source.content)) continue
+    await payload.update({ collection: 'posts-new', id: source.id, locale, context: { skipLocalizationWorkflow: true }, data: { content } })
+  }
 }
 
 function applyLinkPlan(content: unknown, links: any[]): unknown {
@@ -146,14 +187,51 @@ function applyLinkPlan(content: unknown, links: any[]): unknown {
   return clone
 }
 
-async function translateFAQs(faqs: any[], source: ContentLocale, target: ContentLocale): Promise<any[]> {
+async function translateFAQs(faqs: any[], source: ContentLocale, target: ContentLocale, glossary = ''): Promise<any[]> {
   return Promise.all((faqs || []).map(async (faq) => {
     const question = await openRouterJSON(
-      `Translate this sailing FAQ question from ${source} to ${target}. ${YACHTING_GLOSSARY} Return JSON {"question":"..."}.`,
+      `Translate this sailing FAQ question from ${source} to ${target}. ${YACHTING_GLOSSARY}\n${glossary} Return JSON {"question":"..."}.`,
       JSON.stringify({ question: faq.question }),
     )
-    return { ...faq, question: question.question, answer: await translateLexical(faq.answer, source, target) }
+    return { ...faq, question: question.question, answer: await translateLexical(faq.answer, source, target, glossary) }
   }))
+}
+
+async function learnGlossaryCandidates(payload: any, post: any, sourceLocale: ContentLocale) {
+  const article = lexicalPlainText(post.content).slice(0, 60_000)
+  const response = await openRouterJSON(
+    `Extract only specialist sailing, navigation, weather, safety, radio, rigging and certification concepts whose translation requires domain knowledge. Do not include generic words or brands. Return at most 30 concepts as JSON {"concepts":[{"canonicalEnglish":"...","domain":"sailing","translations":{"ru":"...","uk":"...","en":"...","fr":"...","es":"...","de":"...","pl":"..."},"definition":"..."}]}. Use professional terminology; suggestions are for editorial review, not automatic approval.`,
+    JSON.stringify({ sourceLocale, title: post.name, article }),
+  )
+  for (const concept of Array.isArray(response.concepts) ? response.concepts : []) {
+    if (!concept?.canonicalEnglish || !concept?.translations?.en) continue
+    const canonicalKey = generateSlug(String(concept.canonicalEnglish)).slice(0, 180)
+    if (!canonicalKey) continue
+    const found = await payload.find({ collection: 'glossary-terms', depth: 0, limit: 1, where: { canonicalKey: { equals: canonicalKey } } })
+    const existing = found.docs?.[0]
+    const existingLocales = new Set((existing?.translations || []).map((item: GlossaryTranslation) => item.locale))
+    const proposals = Object.entries(concept.translations).flatMap(([locale, term]) => typeof term === 'string' && term.trim() && !existingLocales.has(locale) ? [{ locale, term: term.trim(), definition: concept.definition, status: 'proposed', provenance: 'article', confidence: 0.7 }] : [])
+    if (existing) {
+      await payload.update({ collection: 'glossary-terms', id: existing.id, data: { translations: [...(existing.translations || []), ...proposals], evidencePosts: [...new Set([...(existing.evidencePosts || []).map((value: any) => typeof value === 'object' ? value.id : value), post.id])] } })
+    } else {
+      await payload.create({ collection: 'glossary-terms', data: { canonicalKey, domain: GLOSSARY_DOMAINS.has(concept.domain) ? concept.domain : 'general', status: 'proposed', translations: proposals, evidencePosts: [post.id] } })
+    }
+  }
+}
+
+async function loadApprovedGlossary(payload: any, article: unknown, sourceLocale: ContentLocale, targetLocale: ContentLocale): Promise<string> {
+  const text = lexicalPlainText(article).toLocaleLowerCase(sourceLocale)
+  const result = await payload.find({ collection: 'glossary-terms', depth: 0, limit: 0, where: { status: { equals: 'approved' } } })
+  const matches = result.docs.flatMap((doc: any) => {
+    const translations = doc.translations as GlossaryTranslation[]
+    const source = translations.find((item) => item.locale === sourceLocale && item.status === 'approved')
+    const target = translations.find((item) => item.locale === targetLocale && item.status === 'approved')
+    const variants = [source?.term, ...(source?.aliases || []).map((item) => item.value)].filter(Boolean) as string[]
+    if (!source?.term || !target?.term || !variants.some((term) => text.includes(term.toLocaleLowerCase(sourceLocale)))) return []
+    const forbidden = (target.forbiddenVariants || []).map((item) => item.value).filter(Boolean)
+    return [`${source.term} => ${target.term}${target.usageNotes ? ` (${target.usageNotes})` : ''}${forbidden.length ? `; avoid: ${forbidden.join(', ')}` : ''}`]
+  }).slice(0, 250)
+  return matches.length ? `Approved Navi.training terminology:\n${matches.join('\n')}` : ''
 }
 
 function lexicalPlainText(content: unknown): string {
@@ -197,7 +275,7 @@ export const localizePostTask: TaskConfig<any> = {
     { name: 'postId', type: 'number', required: true },
     { name: 'sourceLocale', type: 'select', required: true, options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
     { name: 'targetLocales', type: 'select', hasMany: true, required: true, options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
-    { name: 'changedFields', type: 'select', hasMany: true, required: true, options: ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags'].map((value) => ({ label: value, value })) },
+    { name: 'changedFields', type: 'select', hasMany: true, required: true, options: ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags', 'publicationStatus'].map((value) => ({ label: value, value })) },
   ],
   outputSchema: [
     { name: 'completedLocales', type: 'select', hasMany: true, options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
@@ -215,8 +293,13 @@ export const localizePostTask: TaskConfig<any> = {
     const changed = new Set(input.changedFields || ['name', 'content', 'summary', 'image'])
     const completed: ContentLocale[] = []
 
-    const sourceEditorial = await generateEditorialFields({ content: source.content, locale: sourceLocale, name: source.name, summary: source.summary })
+    if (changed.has('content') || changed.has('name')) await learnGlossaryCandidates(req.payload, source, sourceLocale)
+    const sourceGlossary = await loadApprovedGlossary(req.payload, source.content, sourceLocale, sourceLocale)
+
+    const sourceEditorial = await generateEditorialFields({ content: source.content, locale: sourceLocale, name: source.name, summary: source.summary, glossary: sourceGlossary })
     const sourceLinkPlan = await generateLinkPlan(req.payload, source, sourceLocale)
+    const sourceInboundLinkPlan = await generateInboundLinkPlan(req.payload, source, sourceLocale)
+    if (source.publicationStatus === 'published') await applyInboundLinks(req.payload, sourceInboundLinkPlan, sourceLocale)
     const sourceContent = applyLinkPlan(source.content, sourceLinkPlan)
     const sourceJSONLD = buildJSONLD({ ...source, content: sourceContent }, sourceLocale, sourceEditorial, source.faqs)
     await req.payload.update({
@@ -226,24 +309,28 @@ export const localizePostTask: TaskConfig<any> = {
         content: sourceContent,
         imageAlt: sourceEditorial.imageAlt,
         seo: { ...(source.seo || {}), title: source.seo?.title || sourceEditorial.seoTitle, meta_description: source.seo?.meta_description || sourceEditorial.metaDescription, focus_keyphrase: source.seo?.focus_keyphrase || sourceEditorial.focusKeyphrase, link_keywords: sourceLinkPlan.map((link: any) => `${link.anchor} -> ${link.url}`).join('\n'), json_ld: sourceJSONLD },
-        localizationWorkflow: { ...(source.localizationWorkflow || {}), linkPlan: sourceLinkPlan },
+        localizationWorkflow: { ...(source.localizationWorkflow || {}), linkPlan: sourceLinkPlan, inboundLinkPlan: sourceInboundLinkPlan },
       },
     })
     completed.push(sourceLocale)
 
     for (const target of targets) {
       const current = await req.payload.findByID({ collection: 'posts-new', id: source.id, locale: target, fallbackLocale: false, depth: 0 }) as any
+      const glossary = await loadApprovedGlossary(req.payload, source.content, sourceLocale, target)
       const translatedContent = changed.has('content') || !current.content
-        ? localizeInternalURLs(await translateLexical(source.content, sourceLocale, target), target)
+        ? localizeInternalURLs(await translateLexical(source.content, sourceLocale, target, glossary), target)
         : current.content
       const translatedTitle = changed.has('name') || !current.name
-        ? await openRouterJSON(`Translate this sailing article title from ${sourceLocale} to ${target}. ${YACHTING_GLOSSARY} Return JSON {"title":"..."}.`, JSON.stringify({ title: source.name }))
+        ? await openRouterJSON(`Translate this sailing article title from ${sourceLocale} to ${target}. ${YACHTING_GLOSSARY}\n${glossary} Return JSON {"title":"..."}.`, JSON.stringify({ title: source.name }))
         : { title: current.name }
-      const editorial = await generateEditorialFields({ content: translatedContent, locale: target, name: translatedTitle.title || source.name })
-      const localized = { ...source, id: source.id, content: translatedContent, name: translatedTitle.title || editorial.title }
+      const editorial = await generateEditorialFields({ content: translatedContent, locale: target, name: translatedTitle.title || source.name, glossary })
+      const localizedName = translatedTitle.title || editorial.title
+      const localized = { ...source, id: source.id, content: translatedContent, name: localizedName, slug: current.slug || generateSlug(localizedName) }
       const linkPlan = await generateLinkPlan(req.payload, localized, target)
+      const inboundLinkPlan = await generateInboundLinkPlan(req.payload, localized, target)
+      if (source.publicationStatus === 'published') await applyInboundLinks(req.payload, inboundLinkPlan, target)
       const linkedContent = applyLinkPlan(translatedContent, linkPlan)
-      const localizedFAQs = changed.has('faqs') || !current.faqs?.length ? await translateFAQs(source.faqs || [], sourceLocale, target) : current.faqs
+      const localizedFAQs = changed.has('faqs') || !current.faqs?.length ? await translateFAQs(source.faqs || [], sourceLocale, target, glossary) : current.faqs
       const jsonLD = buildJSONLD({ ...localized, content: linkedContent, slug: generateSlug(localized.name) }, target, editorial, localizedFAQs)
       await req.payload.update({
         collection: 'posts-new', id: source.id, locale: target, context: { skipLocalizationWorkflow: true },
@@ -255,7 +342,7 @@ export const localizePostTask: TaskConfig<any> = {
           faqs: localizedFAQs,
           imageAlt: editorial.imageAlt,
           seo: { title: editorial.seoTitle, meta_description: editorial.metaDescription, focus_keyphrase: editorial.focusKeyphrase, link_keywords: linkPlan.map((link: any) => `${link.anchor} -> ${link.url}`).join('\n'), json_ld: jsonLD },
-          localizationWorkflow: { ...(source.localizationWorkflow || {}), linkPlan },
+          localizationWorkflow: { ...(source.localizationWorkflow || {}), linkPlan, inboundLinkPlan },
         },
       })
       completed.push(target)

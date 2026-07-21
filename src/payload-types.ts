@@ -76,6 +76,7 @@ export interface Config {
     'team-new': TeamNew;
     certificates: Certificate;
     trainings: Training;
+    'glossary-terms': GlossaryTerm;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
@@ -93,6 +94,7 @@ export interface Config {
     'team-new': TeamNewSelect<false> | TeamNewSelect<true>;
     certificates: CertificatesSelect<false> | CertificatesSelect<true>;
     trainings: TrainingsSelect<false> | TrainingsSelect<true>;
+    'glossary-terms': GlossaryTermsSelect<false> | GlossaryTermsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -354,6 +356,18 @@ export interface PostsNew {
      * AI proposals: target, exact anchor, reason and section. Kept for editorial review before applying.
      */
     linkPlan?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * Published articles selected to link back to this article. Applied only after this article is published.
+     */
+    inboundLinkPlan?:
       | {
           [k: string]: unknown;
         }
@@ -997,6 +1011,61 @@ export interface Training {
   _status?: ('draft' | 'published') | null;
 }
 /**
+ * One sailing concept with any number of language variants. Approved variants are used by localization jobs.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "glossary-terms".
+ */
+export interface GlossaryTerm {
+  id: number;
+  /**
+   * Stable language-neutral key, normally the preferred English term.
+   */
+  canonicalKey: string;
+  domain:
+    | 'general'
+    | 'sailing'
+    | 'navigation'
+    | 'meteorology'
+    | 'safety'
+    | 'radio'
+    | 'rigging'
+    | 'boatbuilding'
+    | 'racing'
+    | 'charter'
+    | 'certification';
+  status: 'proposed' | 'approved' | 'deprecated';
+  translations: {
+    /**
+     * BCP-47 code: ru, uk, en, fr, es, de, pl, etc. Adding a language does not require a DB migration.
+     */
+    locale: string;
+    term: string;
+    aliases?:
+      | {
+          value: string;
+          id?: string | null;
+        }[]
+      | null;
+    definition?: string | null;
+    usageNotes?: string | null;
+    forbiddenVariants?:
+      | {
+          value: string;
+          id?: string | null;
+        }[]
+      | null;
+    status: 'proposed' | 'approved' | 'rejected';
+    provenance: 'manual' | 'article' | 'txt-source' | 'pdf-source' | 'agent';
+    confidence?: number | null;
+    id?: string | null;
+  }[];
+  evidencePosts?: (number | PostsNew)[] | null;
+  editorNotes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -1151,6 +1220,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'trainings';
         value: number | Training;
+      } | null)
+    | ({
+        relationTo: 'glossary-terms';
+        value: number | GlossaryTerm;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -1347,6 +1420,7 @@ export interface PostsNewSelect<T extends boolean = true> {
         lastCompletedAt?: T;
         lastError?: T;
         linkPlan?: T;
+        inboundLinkPlan?: T;
       };
   name?: T;
   slug?: T;
@@ -1535,6 +1609,43 @@ export interface TrainingsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "glossary-terms_select".
+ */
+export interface GlossaryTermsSelect<T extends boolean = true> {
+  canonicalKey?: T;
+  domain?: T;
+  status?: T;
+  translations?:
+    | T
+    | {
+        locale?: T;
+        term?: T;
+        aliases?:
+          | T
+          | {
+              value?: T;
+              id?: T;
+            };
+        definition?: T;
+        usageNotes?: T;
+        forbiddenVariants?:
+          | T
+          | {
+              value?: T;
+              id?: T;
+            };
+        status?: T;
+        provenance?: T;
+        confidence?: T;
+        id?: T;
+      };
+  evidencePosts?: T;
+  editorNotes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv_select".
  */
 export interface PayloadKvSelect<T extends boolean = true> {
@@ -1704,6 +1815,7 @@ export interface TaskLocalizePost {
     postId: number;
     sourceLocale: 'ru' | 'uk' | 'en';
     targetLocales: ('ru' | 'uk' | 'en')[];
+    changedFields: ('name' | 'content' | 'summary' | 'image' | 'faqs' | 'authors' | 'tags' | 'publicationStatus')[];
   };
   output: {
     completedLocales?: ('ru' | 'uk' | 'en')[] | null;

@@ -19,6 +19,7 @@ import { Pages } from './content/Pages'
 import { env } from './config/env'
 import { CONTENT_LOCALES } from './config/contentLocales'
 import { localizePostTask } from './jobs/localizePost'
+import { GlossaryTerms } from './collections/GlossaryTerms'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -35,7 +36,7 @@ export default buildConfig({
   cors: [env.serverUrl],
   csrf: [env.serverUrl],
   defaultDepth: 0,
-  collections: [Users, Media, Redirects, Pages, Posts, Tags, Team, Certificates, Trainings],
+  collections: [Users, Media, Redirects, Pages, Posts, Tags, Team, Certificates, Trainings, GlossaryTerms],
   globals: [SiteGlobals],
   editor: lexicalEditor(),
   secret: env.payloadSecret,

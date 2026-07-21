@@ -55,7 +55,7 @@ export const Posts: CollectionConfig = {
         const targetLocales = doc.localizationWorkflow.targetLocales?.length
           ? doc.localizationWorkflow.targetLocales
           : CONTENT_LOCALES.map(({ code }) => code);
-        const watchedFields = ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags'] as const;
+        const watchedFields = ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags', 'publicationStatus'] as const;
         const changedFields = !previousDoc || !previousDoc.localizationWorkflow?.autoRun
           ? [...watchedFields]
           : watchedFields.filter((field) => JSON.stringify(doc[field]) !== JSON.stringify(previousDoc[field]));
@@ -110,6 +110,7 @@ export const Posts: CollectionConfig = {
                 { type: 'date', name: 'lastCompletedAt', label: 'Last completed', admin: { readOnly: true } },
                 { type: 'textarea', name: 'lastError', label: 'Last error', admin: { readOnly: true } },
                 { type: 'json', name: 'linkPlan', label: 'Thematic internal-link plan', localized: true, admin: { readOnly: true, description: 'AI proposals: target, exact anchor, reason and section. Kept for editorial review before applying.' } },
+                { type: 'json', name: 'inboundLinkPlan', label: 'Incoming internal-link plan', localized: true, admin: { readOnly: true, description: 'Published articles selected to link back to this article. Applied only after this article is published.' } },
               ],
             },
           ],
