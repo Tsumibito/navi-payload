@@ -55,6 +55,17 @@ export const Trainings: CollectionConfig = {
                 description: 'URL-friendly identifier per language',
               },
             },
+            {
+              type: 'relationship',
+              name: 'certificates',
+              label: 'Certificates shown on the training page',
+              relationTo: 'certificates',
+              hasMany: true,
+              admin: {
+                description:
+                  'Ordered certificate tabs rendered into the Astro SSG page. The first certificate is selected by default.',
+              },
+            },
           ],
         },
         {

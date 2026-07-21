@@ -908,6 +908,10 @@ export interface Training {
    * URL-friendly identifier per language
    */
   slug: string;
+  /**
+   * Ordered certificate tabs rendered into the Astro SSG page. The first certificate is selected by default.
+   */
+  certificates?: (number | Certificate)[] | null;
   seo?: {
     /**
      * Оптимально 50–60 символов
@@ -1363,6 +1367,7 @@ export interface CertificatesSelect<T extends boolean = true> {
 export interface TrainingsSelect<T extends boolean = true> {
   name?: T;
   slug?: T;
+  certificates?: T;
   seo?:
     | T
     | {

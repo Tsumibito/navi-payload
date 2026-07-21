@@ -1,5 +1,4 @@
 import { postgresAdapter } from '@payloadcms/db-postgres'
-import { payloadCloudPlugin } from '@payloadcms/payload-cloud'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { s3Storage } from '@payloadcms/storage-s3'
 import path from 'path'
@@ -17,6 +16,7 @@ import { Trainings } from './content/Trainings'
 import { SiteGlobals } from './globals/SiteGlobals'
 import { Redirects } from './collections/Redirects'
 import { Pages } from './content/Pages'
+import { env } from './config/env'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -29,11 +29,14 @@ export default buildConfig({
       autoGenerate: false,
     },
   },
-  defaultDepth: 1,
+  serverURL: env.serverUrl,
+  cors: [env.serverUrl],
+  csrf: [env.serverUrl],
+  defaultDepth: 0,
   collections: [Users, Media, Redirects, Pages, Posts, Tags, Team, Certificates, Trainings],
   globals: [SiteGlobals],
   editor: lexicalEditor(),
-  secret: process.env.PAYLOAD_SECRET || '',
+  secret: env.payloadSecret,
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
@@ -45,35 +48,31 @@ export default buildConfig({
     fallback: true,
   },
   db: postgresAdapter({
-    schemaName: process.env.PAYLOAD_DB_SCHEMA || 'navi',
+    schemaName: env.databaseSchema,
     pool: {
-      connectionString: process.env.DATABASE_URI || '',
-      min: 0,
-      max: 5,
-      idleTimeoutMillis: 10_000,
-      connectionTimeoutMillis: 10_000,
+      connectionString: env.databaseUri,
+      ...env.databasePool,
     },
     push: false,
   }),
   sharp,
   plugins: [
-    payloadCloudPlugin(),
     s3Storage({
       collections: {
         media: {
           generateFileURL: ({ filename }) =>
-            `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${filename}`,
+            `${env.r2.publicUrl}/${filename}`,
           prefix: '',
         },
       },
-      bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME ?? '',
+      bucket: env.r2.bucket,
       config: {
-        endpoint: process.env.CLOUDFLARE_R2_ENDPOINT,
+        endpoint: env.r2.endpoint,
         region: 'auto',
         forcePathStyle: true,
         credentials: {
-          accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ?? '',
-          secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY ?? '',
+          accessKeyId: env.r2.accessKeyId,
+          secretAccessKey: env.r2.secretAccessKey,
         },
       },
       clientUploads: false,

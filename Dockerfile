@@ -13,7 +13,16 @@ RUN --mount=type=cache,target=/root/.npm \
 
 COPY . .
 ENV NODE_ENV=production
-RUN npm run build
+# Next imports the Payload configuration while compiling. Real production
+# credentials are never needed at this stage; they are decrypted only when the
+# container starts. These placeholders exist for config validation during build.
+RUN PAYLOAD_SECRET=build-only-placeholder-not-used-at-runtime \
+  DATABASE_URI=postgresql://build:build@127.0.0.1:5432/build \
+  CLOUDFLARE_R2_ACCESS_KEY_ID=build-placeholder \
+  CLOUDFLARE_R2_SECRET_ACCESS_KEY=build-placeholder \
+  CLOUDFLARE_R2_BUCKET_NAME=build-placeholder \
+  CLOUDFLARE_R2_ENDPOINT=https://example.invalid \
+  npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
@@ -24,6 +33,7 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 RUN apk add --no-cache libc6-compat curl && \
+  npm install --global @dotenvx/dotenvx@2.15.1 --no-audit --no-fund && \
   addgroup --system --gid 1001 nodejs && \
   adduser --system --uid 1001 nextjs
 
@@ -32,6 +42,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/migrations ./migrations
+COPY --from=builder --chown=nextjs:nodejs /app/.env.production ./.env.production
 
 USER nextjs
 
@@ -41,4 +52,7 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD curl -fsS http://127.0.0.1:3000/api/health || exit 1
 
+# Keep decryption in ENTRYPOINT so platform-level command overrides (Coolify,
+# Compose, Kubernetes) cannot accidentally bypass production env loading.
+ENTRYPOINT ["dotenvx", "run", "-f", ".env.production", "--"]
 CMD ["node", "server.js"]
