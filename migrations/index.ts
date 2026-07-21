@@ -6,6 +6,7 @@ import * as migration_20260721_165400_trainings_seo_alignment from './20260721_1
 import * as migration_20260721_172549_glossary_intelligence from './20260721_172549_glossary_intelligence';
 import * as migration_20260721_175821_glossary_encyclopedia_mvp from './20260721_175821_glossary_encyclopedia_mvp';
 import * as migration_20260721_190000_post_editorial_workflow from './20260721_190000_post_editorial_workflow';
+import * as migration_20260721_235500_leads from './20260721_235500_leads';
 
 export const migrations = [
   {
@@ -47,5 +48,10 @@ export const migrations = [
     up: migration_20260721_190000_post_editorial_workflow.up,
     down: migration_20260721_190000_post_editorial_workflow.down,
     name: '20260721_190000_post_editorial_workflow'
+  },
+  {
+    up: migration_20260721_235500_leads.up,
+    down: migration_20260721_235500_leads.down,
+    name: '20260721_235500_leads'
   },
 ];
