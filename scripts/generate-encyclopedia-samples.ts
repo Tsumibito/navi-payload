@@ -8,7 +8,9 @@ if (!token) throw new Error('OPENROUTER_TOKEN is required')
 
 const model = process.env.OPENROUTER_GLOSSARY_MODEL?.trim() || 'deepseek/deepseek-v4-flash'
 const publish = process.argv.includes('--publish')
+console.log(`Starting encyclopedia samples with ${model} (${publish ? 'publish' : 'draft'} mode)`)
 const payload = await getPayload({ config })
+console.log('Payload initialized; collecting public article evidence')
 
 const concepts = [
   { canonicalKey: 'apparent wind', category: 'meteorology', queries: { en: 'apparent wind sailing', ru: 'вымпельный ветер', uk: 'вимпельний вітер' } },
@@ -55,10 +57,13 @@ async function wikipediaEvidence(locale: Locale, query: string) {
 }
 
 for (const concept of concepts) {
+  console.log(`Collecting evidence: ${concept.canonicalKey}`)
   const evidence = Object.fromEntries(await Promise.all((Object.entries(concept.queries) as [Locale, string][]).map(async ([locale, query]) => {
     const [articles, wikipedia] = await Promise.all([articleEvidence(locale, query), wikipediaEvidence(locale, query)])
     return [locale, { articles, wikipedia }]
   })))
+
+  console.log(`Generating: ${concept.canonicalKey}`)
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
