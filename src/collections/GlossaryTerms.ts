@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { authenticated } from '../access/authenticated'
+import { authenticated, ssgPublishedGlossaryOrAuthenticated } from '../access/authenticated'
 
 const normalizeLocale = (value: unknown) => String(value || '').trim().toLowerCase().replace('_', '-')
 
@@ -13,7 +13,7 @@ export const GlossaryTerms: CollectionConfig = {
     group: 'Editorial intelligence',
     description: 'One sailing concept with any number of language variants. Approved variants are used by localization jobs.',
   },
-  access: { read: authenticated, create: authenticated, update: authenticated, delete: authenticated },
+  access: { read: ssgPublishedGlossaryOrAuthenticated, create: authenticated, update: authenticated, delete: authenticated },
   hooks: {
     beforeValidate: [({ data }) => {
       if (!data) return data

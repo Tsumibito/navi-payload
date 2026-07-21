@@ -33,3 +33,15 @@ export const ssgPublishedOrAuthenticated: Access = ({ req }) => {
     },
   };
 };
+
+export const ssgPublishedGlossaryOrAuthenticated: Access = ({ req }) => {
+  if (req.user) return true;
+
+  const suppliedKey = req.headers.get('x-navi-ssg-key');
+  if (!suppliedKey || suppliedKey !== env.ssgApiKey) return false;
+
+  return {
+    status: { equals: 'approved' },
+    release: { equals: 'published' },
+  };
+};
