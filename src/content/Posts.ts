@@ -105,6 +105,7 @@ export const Posts: CollectionConfig = {
         {
           label: 'Localization workflow',
           fields: [
+            { type: 'ui', name: 'runEditorialWorkflow', admin: { components: { Field: '/src/components/EditorialWorkflowButton#EditorialWorkflowButton' } } },
             {
               type: 'group', name: 'localizationWorkflow', label: 'Automated localization', fields: [
                 { type: 'select', name: 'sourceLocale', label: 'Language this article was written in', required: true, defaultValue: 'ru', options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
