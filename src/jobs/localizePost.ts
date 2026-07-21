@@ -88,7 +88,7 @@ async function translateLexical(content: unknown, source: ContentLocale, target:
   for (let offset = 0; offset < nodes.length; offset += 35) {
     const batch = nodes.slice(offset, offset + 35)
     const translated = await openRouterJSON(
-      `You are a professional sailing editor. Translate from ${source} to ${target}. ${YACHTING_GLOSSARY}\n${glossary} Return only JSON {"items":{"id":"translation"}}. Preserve meaning, punctuation and inline spacing.`,
+      `You are a professional maritime translator and Navi.training editor. Translate from ${source} into natural, publication-quality ${target}; never leave source-language prose in the result. ${YACHTING_GLOSSARY}\n${glossary} Preserve technical meaning, units, cautions, punctuation, inline spacing and the relationship between adjacent fragments. Use established yacht terminology rather than literal calques. Do not add facts or marketing language. Return only JSON {"items":{"id":"translation"}}.`,
       JSON.stringify({ items: Object.fromEntries(batch.map(({ id, node }) => [id, node.text])) }),
     )
     for (const { id, node } of batch) {
@@ -125,7 +125,8 @@ function localizeInternalURLs(content: unknown, target: ContentLocale): unknown 
 async function generateEditorialFields(args: { content: unknown; locale: ContentLocale; name: string; summary?: string; glossary?: string }) {
   const plainText = collectTextNodes(structuredClone(args.content)).map(({ node }) => node.text).join(' ').slice(0, 24_000)
   return openRouterJSON(
-    `You are an SEO editor for a professional sailing school. Write in ${args.locale}. ${YACHTING_GLOSSARY}\n${args.glossary || ''} Return JSON with title, summary, seoTitle, metaDescription, focusKeyphrase, imageAlt. SEO title 45-60 characters; description 135-160 characters; no keyword stuffing.`,
+    `You are the senior multilingual editor of Navi.training, a professional sailing school. Write exclusively in ${args.locale}; never mix languages. ${YACHTING_GLOSSARY}\n${args.glossary || ''}
+Return JSON with title, summary, seoTitle, metaDescription, focusKeyphrase, imageAlt. The summary is two concrete sentences (220-320 characters) explaining what the reader will learn. SEO title is 45-60 characters and preserves the real search intent. Meta description is 135-160 characters with a natural benefit, not a keyword list. focusKeyphrase is one realistic query. imageAlt describes only the likely article subject, without “image of”. Do not invent prices, laws, qualifications or equipment capabilities. Avoid clickbait, generic praise and repeated phrases.`,
     JSON.stringify({ title: args.name, currentSummary: args.summary, article: plainText }),
   )
 }
@@ -145,7 +146,7 @@ function lexicalParagraph(text: string): unknown {
 async function generateFAQs(content: unknown, locale: ContentLocale, glossary = ''): Promise<any[]> {
   const article = lexicalPlainText(content).slice(0, 30_000)
   const response = await openRouterJSON(
-    `You are an editor for a professional sailing school. Create 4-6 concise FAQs in ${locale} that answer genuine reader questions covered by the article. ${YACHTING_GLOSSARY}\n${glossary} Each answer must be factually conservative, useful and 35-80 words. Do not invent legal requirements or equipment capabilities. Return JSON {"faqs":[{"question":"...","answer":"..."}]}.`,
+    `You are the practical knowledge editor of Navi.training. Create 4-6 FAQs exclusively in ${locale}. Questions must match real reader intent and be answerable from the article; cover different decisions or misunderstandings instead of paraphrasing one question. ${YACHTING_GLOSSARY}\n${glossary} Each answer is self-contained, factually conservative and 35-80 words. Preserve necessary safety caveats. Do not invent legal requirements, prices or equipment capabilities. Return JSON {"faqs":[{"question":"...","answer":"..."}]}.`,
     JSON.stringify({ article }),
   )
   return (Array.isArray(response.faqs) ? response.faqs : []).flatMap((faq: any) => {
@@ -217,7 +218,7 @@ async function selectTags(payload: any, post: any, locale: ContentLocale): Promi
   const candidates = result.docs.map((tag: any) => ({ id: tag.id, name: tag.name, slug: tag.slug, summary: tag.summary })).filter((tag: any) => tag.name)
   const article = lexicalPlainText(post.content).slice(0, 24_000)
   const response = await openRouterJSON(
-    `You are the taxonomy editor for Navi.training. Select 3-6 existing tags that precisely describe the article and support a coherent topic cluster. Prefer specific tags over generic ones. Never invent an ID. Return JSON {"tagIds":[1,2],"reason":"..."}.`,
+    `You are the taxonomy editor for Navi.training. Select 3-6 existing tags that precisely describe the article and place it in a coherent sailing topic cluster. Choose one primary subject, then only supporting concepts materially covered in the text. Prefer specific tags; reject generic, adjacent or merely mentioned topics. Never invent an ID. Return JSON {"tagIds":[1,2],"reason":"..."}.`,
     JSON.stringify({ title: post.name, summary: post.summary, article, candidates }), editorialModel(),
   )
   const allowed = new Set(candidates.map((tag: any) => String(tag.id)))
@@ -366,6 +367,7 @@ export const localizePostTask: TaskConfig<any> = {
     { name: 'sourceLocale', type: 'select', required: true, options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
     { name: 'targetLocales', type: 'select', hasMany: true, required: true, options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
     { name: 'changedFields', type: 'select', hasMany: true, required: true, options: ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags', 'publicationStatus'].map((value) => ({ label: value, value })) },
+    { name: 'stages', type: 'select', hasMany: true, options: ['source-editorial', 'translations', 'taxonomy-links', 'image'].map((value) => ({ label: value, value })) },
   ],
   outputSchema: [
     { name: 'completedLocales', type: 'select', hasMany: true, options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
@@ -381,10 +383,16 @@ export const localizePostTask: TaskConfig<any> = {
     })
     const targets = [...new Set((input.targetLocales || []).filter((locale: string) => locale !== sourceLocale))] as ContentLocale[]
     const changed = new Set(input.changedFields || ['name', 'content', 'summary', 'image'])
+    const stages = new Set(input.stages?.length ? input.stages : ['source-editorial', 'translations', 'taxonomy-links', 'image'])
+    const runSourceEditorial = stages.has('source-editorial')
+    const runTranslations = stages.has('translations')
+    const runTaxonomyLinks = stages.has('taxonomy-links')
+    const runImage = stages.has('image')
+    const fullRun = runSourceEditorial && runTranslations && runTaxonomyLinks && runImage
     const completed: ContentLocale[] = []
 
-    if (changed.has('content') || changed.has('name')) await learnGlossaryCandidates(req.payload, source, sourceLocale)
-    const selectedTagIds = await selectTags(req.payload, source, sourceLocale)
+    if (runTranslations && (changed.has('content') || changed.has('name'))) await learnGlossaryCandidates(req.payload, source, sourceLocale)
+    const selectedTagIds = runTaxonomyLinks ? await selectTags(req.payload, source, sourceLocale) : []
     if (selectedTagIds.length) {
       const selectedTags = selectedTagIds.map((value) => ({ relationTo: 'tags-new', value }))
       source.tags = selectedTags
@@ -392,7 +400,7 @@ export const localizePostTask: TaskConfig<any> = {
       const refreshed = await req.payload.findByID({ collection: 'posts-new', id: source.id, locale: sourceLocale, fallbackLocale: false, depth: 1 }) as any
       source.tags = refreshed.tags
     }
-    if (source.localizationWorkflow?.imagePrompt && (!source.image || source.localizationWorkflow?.regenerateImage)) {
+    if (runImage && source.localizationWorkflow?.imagePrompt && (!source.image || source.localizationWorkflow?.regenerateImage)) {
       const image = await generateHeroImage(req.payload, source.localizationWorkflow.imagePrompt, source.name)
       source.image = image
       source.localizationWorkflow = {
@@ -405,28 +413,30 @@ export const localizePostTask: TaskConfig<any> = {
     }
     const sourceGlossary = await loadApprovedGlossary(req.payload, source.content, sourceLocale, sourceLocale)
 
-    const sourceEditorial = await generateEditorialFields({ content: source.content, locale: sourceLocale, name: source.name, summary: source.summary, glossary: sourceGlossary })
-    const sourceFAQs = source.faqs?.length ? source.faqs : await generateFAQs(source.content, sourceLocale, sourceGlossary)
-    const sourceLinkPlan = await generateLinkPlan(req.payload, source, sourceLocale)
-    const sourceInboundLinkPlan = await generateInboundLinkPlan(req.payload, source, sourceLocale)
-    if (source.publicationStatus === 'published') await applyInboundLinks(req.payload, sourceInboundLinkPlan, sourceLocale)
-    const sourceContent = applyLinkPlan(source.content, sourceLinkPlan)
-    assertLocalizedResult({ locale: sourceLocale, post: { ...source, content: sourceContent }, editorial: sourceEditorial, faqs: sourceFAQs, linkPlan: sourceLinkPlan })
+    const sourceEditorial = runSourceEditorial
+      ? await generateEditorialFields({ content: source.content, locale: sourceLocale, name: source.name, summary: source.summary, glossary: sourceGlossary })
+      : { summary: source.summary, seoTitle: source.seo?.title, metaDescription: source.seo?.meta_description, focusKeyphrase: source.seo?.focus_keyphrase, imageAlt: source.imageAlt }
+    const sourceFAQs = runSourceEditorial || (runTranslations && !(source.faqs || []).length)
+      ? await generateFAQs(source.content, sourceLocale, sourceGlossary)
+      : (source.faqs || [])
+    const sourceLinkPlan = runTaxonomyLinks ? await generateLinkPlan(req.payload, source, sourceLocale) : (source.localizationWorkflow?.linkPlan || [])
+    const sourceInboundLinkPlan = runTaxonomyLinks ? await generateInboundLinkPlan(req.payload, source, sourceLocale) : (source.localizationWorkflow?.inboundLinkPlan || [])
+    if (runTaxonomyLinks && source.publicationStatus === 'published') await applyInboundLinks(req.payload, sourceInboundLinkPlan, sourceLocale)
+    const sourceContent = runTaxonomyLinks ? applyLinkPlan(source.content, sourceLinkPlan) : source.content
+    if (runSourceEditorial) assertLocalizedResult({ locale: sourceLocale, post: { ...source, content: sourceContent }, editorial: sourceEditorial, faqs: sourceFAQs, linkPlan: sourceLinkPlan })
     const sourceJSONLD = buildJSONLD({ ...source, content: sourceContent }, sourceLocale, sourceEditorial, sourceFAQs)
     await req.payload.update({
       collection: 'posts-new', id: source.id, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
       data: {
-        summary: sourceEditorial.summary || source.summary,
+        ...(runSourceEditorial ? { summary: sourceEditorial.summary || source.summary, faqs: sourceFAQs, imageAlt: sourceEditorial.imageAlt } : {}),
         content: sourceContent,
-        faqs: sourceFAQs,
-        imageAlt: sourceEditorial.imageAlt,
-        seo: { ...(source.seo || {}), title: sourceEditorial.seoTitle, meta_description: sourceEditorial.metaDescription, focus_keyphrase: sourceEditorial.focusKeyphrase, link_keywords: sourceLinkPlan.map((link: any) => `${link.anchor} -> ${link.url}`).join('\n'), json_ld: sourceJSONLD },
+        ...((runSourceEditorial || runTaxonomyLinks) ? { seo: { ...(source.seo || {}), title: sourceEditorial.seoTitle, meta_description: sourceEditorial.metaDescription, focus_keyphrase: sourceEditorial.focusKeyphrase, link_keywords: sourceLinkPlan.map((link: any) => `${link.anchor} -> ${link.url}`).join('\n'), json_ld: sourceJSONLD } } : {}),
         localizationWorkflow: { ...(source.localizationWorkflow || {}), linkPlan: sourceLinkPlan, inboundLinkPlan: sourceInboundLinkPlan },
       },
     })
     completed.push(sourceLocale)
 
-    for (const target of targets) {
+    if (runTranslations) for (const target of targets) {
       const current = await req.payload.findByID({ collection: 'posts-new', id: source.id, locale: target, fallbackLocale: false, depth: 0 }) as any
       const glossary = await loadApprovedGlossary(req.payload, source.content, sourceLocale, target)
       const translatedContent = changed.has('content') || !current.content
@@ -464,7 +474,7 @@ export const localizePostTask: TaskConfig<any> = {
     await req.payload.update({
       collection: 'posts-new', id: source.id, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
       data: {
-        publicationStatus: source.publicationStatus === 'published' ? 'published' : 'ready',
+        publicationStatus: source.publicationStatus === 'published' ? 'published' : fullRun ? 'ready' : 'review',
         localizationWorkflow: {
           ...(source.localizationWorkflow || {}), state: 'review', completedLocales: completed,
           lastCompletedAt: new Date().toISOString(), lastError: null,

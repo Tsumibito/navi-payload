@@ -348,6 +348,13 @@ export interface PostsNew {
     sourceLocale: 'ru' | 'uk' | 'en';
     targetLocales?: ('ru' | 'uk' | 'en')[] | null;
     autoRun?: boolean | null;
+    /**
+     * Optional. Saving the post generates a 16:9 hero image when none exists. Enable regeneration to replace an existing image.
+     */
+    imagePrompt?: string | null;
+    regenerateImage?: boolean | null;
+    generatedImageModel?: string | null;
+    lastImageGeneratedAt?: string | null;
     state?: ('idle' | 'queued' | 'running' | 'review' | 'failed') | null;
     completedLocales?: ('ru' | 'uk' | 'en')[] | null;
     lastCompletedAt?: string | null;
@@ -1447,6 +1454,10 @@ export interface PostsNewSelect<T extends boolean = true> {
         sourceLocale?: T;
         targetLocales?: T;
         autoRun?: T;
+        imagePrompt?: T;
+        regenerateImage?: T;
+        generatedImageModel?: T;
+        lastImageGeneratedAt?: T;
         state?: T;
         completedLocales?: T;
         lastCompletedAt?: T;
@@ -1868,6 +1879,7 @@ export interface TaskLocalizePost {
     sourceLocale: 'ru' | 'uk' | 'en';
     targetLocales: ('ru' | 'uk' | 'en')[];
     changedFields: ('name' | 'content' | 'summary' | 'image' | 'faqs' | 'authors' | 'tags' | 'publicationStatus')[];
+    stages?: ('source-editorial' | 'translations' | 'taxonomy-links' | 'image')[] | null;
   };
   output: {
     completedLocales?: ('ru' | 'uk' | 'en')[] | null;

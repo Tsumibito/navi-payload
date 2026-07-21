@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticatePayloadRequest, unauthorizedResponse } from '@/utils/authenticatedPayload';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const DEFAULT_MODEL = 'anthropic/claude-3.5-sonnet';
+const DEFAULT_MODEL = process.env.OPENROUTER_LOCALIZATION_MODEL || 'google/gemini-3.6-flash';
 
 interface GenerateSummaryRequest {
   content: string;
-  language: 'ru' | 'ua' | 'en';
+  language: 'ru' | 'ua' | 'uk' | 'en';
   title?: string;
   kind?: 'post' | 'tag';
 }
@@ -16,11 +16,13 @@ const SYSTEM_PROMPTS = {
   post: {
     ru: 'Ты профессиональный копирайтер. Создай краткое SEO-оптимизированное описание (summary) для статьи о яхтинге. Описание должно быть 2-3 предложения, привлекательным и информативным. Отвечай только текстом описания без дополнительных комментариев.',
     ua: 'Ти професійний копірайтер. Створи короткий SEO-оптимізований опис (summary) для статті про яхтинг. Опис має бути 2-3 речення, привабливим та інформативним. Відповідай лише текстом опису без додаткових коментарів.',
+    uk: 'Ти професійний редактор яхтової школи. Створи стислий опис статті українською у 2 реченнях. Використовуй професійну яхтову термінологію, конкретно передай користь матеріалу, без клікбейту й переліку ключових слів. Відповідай лише текстом опису.',
     en: 'You are a professional copywriter. Create a brief SEO-optimized summary for a yachting article. The summary should be 2-3 sentences, engaging and informative. Reply only with the summary text without additional comments.',
   },
   tag: {
     ru: 'Ты профессиональный копирайтер. Создай краткое SEO-оптимизированное описание для тега/категории о яхтинге. Описание должно быть 1-2 предложения, четким и информативным. Отвечай только текстом описания без дополнительных комментариев.',
     ua: 'Ти професійний копірайтер. Створи короткий SEO-оптимізований опис для тегу/категорії про яхтинг. Опис має бути 1-2 речення, чітким та інформативним. Відповідай лише текстом опису без додаткових коментарів.',
+    uk: 'Ти професійний редактор яхтової школи. Створи короткий і точний опис категорії українською у 1–2 реченнях. Відповідай лише текстом опису.',
     en: 'You are a professional copywriter. Create a brief SEO-optimized description for a yachting tag/category. The description should be 1-2 sentences, clear and informative. Reply only with the description text without additional comments.',
   },
 };
