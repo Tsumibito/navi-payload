@@ -25,7 +25,8 @@
     "glossary:import": "dotenvx run -f .env.development -- tsx scripts/import-yachting-glossary.ts",
     "glossary:translate": "dotenvx run -f .env.development -- tsx scripts/translate-yachting-glossary.ts",
     "glossary:samples": "dotenvx run -f .env.development -- tsx scripts/generate-encyclopedia-samples.ts",
-    "glossary:batch": "dotenvx run -f .env.development -- tsx scripts/generate-encyclopedia-batch.ts"
+    "glossary:batch": "dotenvx run -f .env.development -- tsx scripts/generate-encyclopedia-batch.ts",
+    "glossary:approve": "dotenvx run -f .env.development -- tsx scripts/approve-encyclopedia.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.901.0",
