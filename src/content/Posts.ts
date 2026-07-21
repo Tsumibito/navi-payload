@@ -56,9 +56,14 @@ export const Posts: CollectionConfig = {
           ? doc.localizationWorkflow.targetLocales
           : CONTENT_LOCALES.map(({ code }) => code);
         const watchedFields = ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags', 'publicationStatus'] as const;
+        const imageRequested = Boolean(doc.localizationWorkflow?.imagePrompt) && (
+          !doc.image || doc.localizationWorkflow?.regenerateImage ||
+          doc.localizationWorkflow?.imagePrompt !== previousDoc?.localizationWorkflow?.imagePrompt
+        );
         const changedFields = !previousDoc || !previousDoc.localizationWorkflow?.autoRun
           ? [...watchedFields]
           : watchedFields.filter((field) => JSON.stringify(doc[field]) !== JSON.stringify(previousDoc[field]));
+        if (imageRequested && !changedFields.includes('image')) changedFields.push('image');
         if (!changedFields.length) return doc;
         await req.payload.jobs.queue({
           task: 'localize-post' as never,
@@ -105,6 +110,10 @@ export const Posts: CollectionConfig = {
                 { type: 'select', name: 'sourceLocale', label: 'Language this article was written in', required: true, defaultValue: 'ru', options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
                 { type: 'select', name: 'targetLocales', label: 'Languages to maintain', hasMany: true, defaultValue: CONTENT_LOCALES.map(({ code }) => code), options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
                 { type: 'checkbox', name: 'autoRun', label: 'Regenerate missing/outdated localized fields after save', defaultValue: false },
+                { type: 'textarea', name: 'imagePrompt', label: 'Hero image prompt', admin: { description: 'Optional. Saving the post generates a 16:9 hero image when none exists. Enable regeneration to replace an existing image.' } },
+                { type: 'checkbox', name: 'regenerateImage', label: 'Regenerate hero image on next workflow run', defaultValue: false },
+                { type: 'text', name: 'generatedImageModel', label: 'Last image model', admin: { readOnly: true } },
+                { type: 'date', name: 'lastImageGeneratedAt', label: 'Last image generation', admin: { readOnly: true } },
                 { type: 'select', name: 'state', label: 'Workflow state', defaultValue: 'idle', admin: { readOnly: true }, options: ['idle', 'queued', 'running', 'review', 'failed'].map((value) => ({ label: value, value })) },
                 { type: 'select', name: 'completedLocales', label: 'Completed locales', hasMany: true, admin: { readOnly: true }, options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
                 { type: 'date', name: 'lastCompletedAt', label: 'Last completed', admin: { readOnly: true } },

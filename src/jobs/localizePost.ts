@@ -7,9 +7,19 @@ type LexicalNode = { type?: string; text?: string; children?: LexicalNode[]; [ke
 type GlossaryTranslation = { locale?: string; term?: string; aliases?: Array<{ value?: string }>; definition?: string; usageNotes?: string; forbiddenVariants?: Array<{ value?: string }>; status?: string }
 const GLOSSARY_DOMAINS = new Set(['general', 'sailing', 'navigation', 'meteorology', 'safety', 'radio', 'rigging', 'boatbuilding', 'racing', 'charter', 'certification'])
 
-const OPENROUTER_LOCALIZATION_MODEL = process.env.OPENROUTER_LOCALIZATION_MODEL?.trim() || 'openai/gpt-5.6-luna'
+function localizationModel() {
+  return process.env.OPENROUTER_LOCALIZATION_MODEL?.trim() || 'openai/gpt-5.6-luna'
+}
 
-async function openRouterJSON(system: string, prompt: string): Promise<Record<string, any>> {
+function editorialModel() {
+  return process.env.OPENROUTER_EDITORIAL_MODEL?.trim() || 'z-ai/glm-5.2'
+}
+
+function imageModel() {
+  return process.env.OPENROUTER_IMAGE_MODEL?.trim() || 'google/gemini-3.1-flash-image'
+}
+
+async function openRouterJSON(system: string, prompt: string, model = localizationModel()): Promise<Record<string, any>> {
   const token = process.env.OPENROUTER_TOKEN?.trim()
   if (!token) throw new Error('OPENROUTER_TOKEN is not configured')
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -21,7 +31,7 @@ async function openRouterJSON(system: string, prompt: string): Promise<Record<st
       'X-Title': 'Navi.training Payload localization',
     },
     body: JSON.stringify({
-      model: OPENROUTER_LOCALIZATION_MODEL,
+      model,
       temperature: 0.15,
       response_format: { type: 'json_object' },
       messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
@@ -32,6 +42,32 @@ async function openRouterJSON(system: string, prompt: string): Promise<Record<st
   const content = body.choices?.[0]?.message?.content
   if (!content) throw new Error('OpenRouter returned an empty response')
   return JSON.parse(content)
+}
+
+async function generateHeroImage(payload: any, prompt: string, title: string) {
+  const token = process.env.OPENROUTER_TOKEN?.trim()
+  if (!token) throw new Error('OPENROUTER_TOKEN is not configured')
+  const response = await fetch('https://openrouter.ai/api/v1/images', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: imageModel(), n: 1, aspect_ratio: '16:9', resolution: '2K', output_format: 'webp', quality: 'high',
+      prompt: `${prompt.trim()}\nEditorial hero image for “${title}”. Professional sailing and maritime context. No logos, watermarks or readable interface text. Photorealistic unless the prompt explicitly requests another style.`,
+    }),
+  })
+  if (!response.ok) throw new Error(`OpenRouter image ${response.status}: ${(await response.text()).slice(0, 500)}`)
+  const body = await response.json() as any
+  const encoded = body.data?.[0]?.b64_json
+  if (typeof encoded !== 'string' || !encoded) throw new Error('OpenRouter returned no image bytes')
+  const data = Buffer.from(encoded, 'base64')
+  if (data.length < 10_000) throw new Error('Generated image is unexpectedly small')
+  const mediaType = body.data?.[0]?.media_type || 'image/webp'
+  const extension = mediaType === 'image/png' ? 'png' : mediaType === 'image/jpeg' ? 'jpg' : 'webp'
+  return payload.create({
+    collection: 'media',
+    data: { alt: title },
+    file: { data, mimetype: mediaType, name: `post-${Date.now()}.${extension}`, size: data.length },
+  })
 }
 
 function collectTextNodes(value: unknown, result: Array<{ id: string; node: LexicalNode }> = []): Array<{ id: string; node: LexicalNode }> {
@@ -94,6 +130,30 @@ async function generateEditorialFields(args: { content: unknown; locale: Content
   )
 }
 
+function lexicalParagraph(text: string): unknown {
+  return {
+    root: {
+      type: 'root', version: 1, format: '', indent: 0, direction: null,
+      children: [{
+        type: 'paragraph', version: 1, format: '', indent: 0, direction: null, textFormat: 0, textStyle: '',
+        children: [{ type: 'text', version: 1, detail: 0, format: 0, mode: 'normal', style: '', text }],
+      }],
+    },
+  }
+}
+
+async function generateFAQs(content: unknown, locale: ContentLocale, glossary = ''): Promise<any[]> {
+  const article = lexicalPlainText(content).slice(0, 30_000)
+  const response = await openRouterJSON(
+    `You are an editor for a professional sailing school. Create 4-6 concise FAQs in ${locale} that answer genuine reader questions covered by the article. ${YACHTING_GLOSSARY}\n${glossary} Each answer must be factually conservative, useful and 35-80 words. Do not invent legal requirements or equipment capabilities. Return JSON {"faqs":[{"question":"...","answer":"..."}]}.`,
+    JSON.stringify({ article }),
+  )
+  return (Array.isArray(response.faqs) ? response.faqs : []).flatMap((faq: any) => {
+    if (typeof faq?.question !== 'string' || typeof faq?.answer !== 'string' || !faq.question.trim() || !faq.answer.trim()) return []
+    return [{ question: faq.question.trim(), answer: lexicalParagraph(faq.answer.trim()) }]
+  }).slice(0, 6)
+}
+
 async function generateLinkPlan(payload: any, post: any, locale: ContentLocale) {
   const tagIds = (post.tags || []).map((tag: any) => typeof tag === 'object' ? tag.value?.id || tag.id || tag.value : tag)
   if (!tagIds.length) return []
@@ -104,7 +164,7 @@ async function generateLinkPlan(payload: any, post: any, locale: ContentLocale) 
   const sourceText = collectTextNodes(structuredClone(post.content)).map(({ node }) => node.text).join(' ').slice(0, 20_000)
   const response = await openRouterJSON(
     `You design useful topic-cluster internal links for a sailing school. Select 2-6 genuinely relevant links, distributed through the article rather than grouped at the end. An anchor must be an exact natural phrase already present in the article. Avoid duplicate targets and commercial over-optimization. Return JSON {"links":[{"targetId":1,"anchor":"exact text","reason":"...","sectionHint":"..."}]}.`,
-    JSON.stringify({ article: sourceText, candidates: candidates.docs.map((doc: any) => ({ id: doc.id, title: doc.name, slug: doc.publicSlug || doc.slug, summary: doc.summary })) }),
+    JSON.stringify({ article: sourceText, candidates: candidates.docs.map((doc: any) => ({ id: doc.id, title: doc.name, slug: doc.publicSlug || doc.slug, summary: doc.summary })) }), editorialModel(),
   )
   const byId = new Map(candidates.docs.map((doc: any) => [String(doc.id), doc]))
   const prefix = locale === 'uk' ? 'ua' : locale
@@ -135,7 +195,7 @@ async function generateInboundLinkPlan(payload: any, target: any, locale: Conten
   if (!sources.length) return []
   const response = await openRouterJSON(
     `Select 2-5 published sailing articles that should link to the new target article. For every source choose one exact natural anchor phrase already present verbatim in that source article. The link must add genuine topical value and be distributed across the cluster. Return JSON {"links":[{"sourcePostId":1,"anchor":"exact phrase","reason":"..."}]}.`,
-    JSON.stringify({ target: { title: target.name, summary: target.summary, url: targetURL }, sources }),
+    JSON.stringify({ target: { title: target.name, summary: target.summary, url: targetURL }, sources }), editorialModel(),
   )
   const byId = new Map(candidates.docs.map((doc: any) => [String(doc.id), doc]))
   return (Array.isArray(response.links) ? response.links : []).flatMap((link: any) => {
@@ -143,6 +203,36 @@ async function generateInboundLinkPlan(payload: any, target: any, locale: Conten
     if (!source || typeof link.anchor !== 'string' || !lexicalPlainText(source.content).includes(link.anchor)) return []
     return [{ ...link, sourcePostId: source.id, sourceTitle: source.name, url: targetURL }]
   }).slice(0, 5)
+}
+
+function relationId(value: any): string | number | undefined {
+  if (value == null) return undefined
+  if (typeof value !== 'object') return value
+  if ('value' in value) return relationId(value.value)
+  return value.id
+}
+
+async function selectTags(payload: any, post: any, locale: ContentLocale): Promise<Array<string | number>> {
+  const result = await payload.find({ collection: 'tags-new', locale, fallbackLocale: false, depth: 0, limit: 0 })
+  const candidates = result.docs.map((tag: any) => ({ id: tag.id, name: tag.name, slug: tag.slug, summary: tag.summary })).filter((tag: any) => tag.name)
+  const article = lexicalPlainText(post.content).slice(0, 24_000)
+  const response = await openRouterJSON(
+    `You are the taxonomy editor for Navi.training. Select 3-6 existing tags that precisely describe the article and support a coherent topic cluster. Prefer specific tags over generic ones. Never invent an ID. Return JSON {"tagIds":[1,2],"reason":"..."}.`,
+    JSON.stringify({ title: post.name, summary: post.summary, article, candidates }), editorialModel(),
+  )
+  const allowed = new Set(candidates.map((tag: any) => String(tag.id)))
+  const selected = (Array.isArray(response.tagIds) ? response.tagIds : []).filter((id: any) => allowed.has(String(id))).slice(0, 6)
+  const fallback = (post.tags || []).map(relationId).filter(Boolean).slice(0, 6) as Array<string | number>
+  return selected.length >= 2 ? selected : fallback
+}
+
+function assertLocalizedResult(args: { locale: ContentLocale; post: any; editorial: any; faqs: any[]; linkPlan: any[] }) {
+  const text = lexicalPlainText(args.post.content)
+  if (!args.post.name?.trim() || text.split(/\s+/).length < 150) throw new Error(`${args.locale}: localized article is incomplete`)
+  if (!args.editorial?.seoTitle || !args.editorial?.metaDescription || !args.editorial?.focusKeyphrase || !args.editorial?.imageAlt) throw new Error(`${args.locale}: editorial fields are incomplete`)
+  if (String(args.editorial.seoTitle).length > 65 || String(args.editorial.metaDescription).length < 100 || String(args.editorial.metaDescription).length > 175) throw new Error(`${args.locale}: invalid SEO lengths`)
+  if (args.faqs.length < 4) throw new Error(`${args.locale}: fewer than four FAQs`)
+  if (args.linkPlan.length > 6) throw new Error(`${args.locale}: too many outgoing links`)
 }
 
 async function applyInboundLinks(payload: any, plan: any[], locale: ContentLocale) {
@@ -294,21 +384,43 @@ export const localizePostTask: TaskConfig<any> = {
     const completed: ContentLocale[] = []
 
     if (changed.has('content') || changed.has('name')) await learnGlossaryCandidates(req.payload, source, sourceLocale)
+    const selectedTagIds = await selectTags(req.payload, source, sourceLocale)
+    if (selectedTagIds.length) {
+      const selectedTags = selectedTagIds.map((value) => ({ relationTo: 'tags-new', value }))
+      source.tags = selectedTags
+      await req.payload.update({ collection: 'posts-new', id: source.id, context: { skipLocalizationWorkflow: true }, data: { tags: selectedTags } })
+      const refreshed = await req.payload.findByID({ collection: 'posts-new', id: source.id, locale: sourceLocale, fallbackLocale: false, depth: 1 }) as any
+      source.tags = refreshed.tags
+    }
+    if (source.localizationWorkflow?.imagePrompt && (!source.image || source.localizationWorkflow?.regenerateImage)) {
+      const image = await generateHeroImage(req.payload, source.localizationWorkflow.imagePrompt, source.name)
+      source.image = image
+      source.localizationWorkflow = {
+        ...source.localizationWorkflow, regenerateImage: false, generatedImageModel: imageModel(), lastImageGeneratedAt: new Date().toISOString(),
+      }
+      await req.payload.update({
+        collection: 'posts-new', id: source.id, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
+        data: { image: image.id, localizationWorkflow: source.localizationWorkflow },
+      })
+    }
     const sourceGlossary = await loadApprovedGlossary(req.payload, source.content, sourceLocale, sourceLocale)
 
     const sourceEditorial = await generateEditorialFields({ content: source.content, locale: sourceLocale, name: source.name, summary: source.summary, glossary: sourceGlossary })
+    const sourceFAQs = source.faqs?.length ? source.faqs : await generateFAQs(source.content, sourceLocale, sourceGlossary)
     const sourceLinkPlan = await generateLinkPlan(req.payload, source, sourceLocale)
     const sourceInboundLinkPlan = await generateInboundLinkPlan(req.payload, source, sourceLocale)
     if (source.publicationStatus === 'published') await applyInboundLinks(req.payload, sourceInboundLinkPlan, sourceLocale)
     const sourceContent = applyLinkPlan(source.content, sourceLinkPlan)
-    const sourceJSONLD = buildJSONLD({ ...source, content: sourceContent }, sourceLocale, sourceEditorial, source.faqs)
+    assertLocalizedResult({ locale: sourceLocale, post: { ...source, content: sourceContent }, editorial: sourceEditorial, faqs: sourceFAQs, linkPlan: sourceLinkPlan })
+    const sourceJSONLD = buildJSONLD({ ...source, content: sourceContent }, sourceLocale, sourceEditorial, sourceFAQs)
     await req.payload.update({
       collection: 'posts-new', id: source.id, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
       data: {
-        summary: source.summary || sourceEditorial.summary,
+        summary: sourceEditorial.summary || source.summary,
         content: sourceContent,
+        faqs: sourceFAQs,
         imageAlt: sourceEditorial.imageAlt,
-        seo: { ...(source.seo || {}), title: source.seo?.title || sourceEditorial.seoTitle, meta_description: source.seo?.meta_description || sourceEditorial.metaDescription, focus_keyphrase: source.seo?.focus_keyphrase || sourceEditorial.focusKeyphrase, link_keywords: sourceLinkPlan.map((link: any) => `${link.anchor} -> ${link.url}`).join('\n'), json_ld: sourceJSONLD },
+        seo: { ...(source.seo || {}), title: sourceEditorial.seoTitle, meta_description: sourceEditorial.metaDescription, focus_keyphrase: sourceEditorial.focusKeyphrase, link_keywords: sourceLinkPlan.map((link: any) => `${link.anchor} -> ${link.url}`).join('\n'), json_ld: sourceJSONLD },
         localizationWorkflow: { ...(source.localizationWorkflow || {}), linkPlan: sourceLinkPlan, inboundLinkPlan: sourceInboundLinkPlan },
       },
     })
@@ -330,7 +442,8 @@ export const localizePostTask: TaskConfig<any> = {
       const inboundLinkPlan = await generateInboundLinkPlan(req.payload, localized, target)
       if (source.publicationStatus === 'published') await applyInboundLinks(req.payload, inboundLinkPlan, target)
       const linkedContent = applyLinkPlan(translatedContent, linkPlan)
-      const localizedFAQs = changed.has('faqs') || !current.faqs?.length ? await translateFAQs(source.faqs || [], sourceLocale, target, glossary) : current.faqs
+      const localizedFAQs = changed.has('faqs') || !current.faqs?.length ? await translateFAQs(sourceFAQs, sourceLocale, target, glossary) : current.faqs
+      assertLocalizedResult({ locale: target, post: { ...localized, content: linkedContent }, editorial, faqs: localizedFAQs, linkPlan })
       const jsonLD = buildJSONLD({ ...localized, content: linkedContent, slug: generateSlug(localized.name) }, target, editorial, localizedFAQs)
       await req.payload.update({
         collection: 'posts-new', id: source.id, locale: target, context: { skipLocalizationWorkflow: true },
@@ -351,7 +464,7 @@ export const localizePostTask: TaskConfig<any> = {
     await req.payload.update({
       collection: 'posts-new', id: source.id, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
       data: {
-        publicationStatus: source.publicationStatus === 'published' ? 'published' : 'review',
+        publicationStatus: source.publicationStatus === 'published' ? 'published' : 'ready',
         localizationWorkflow: {
           ...(source.localizationWorkflow || {}), state: 'review', completedLocales: completed,
           lastCompletedAt: new Date().toISOString(), lastError: null,
