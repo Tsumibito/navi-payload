@@ -43,7 +43,7 @@ if (dryRun) process.exit(0)
 const payload = await getPayload({ config })
 let created = 0
 let updated = 0
-for (const [canonicalKey, variants] of concepts) {
+const upsertConcept = async ([canonicalKey, variants]: [string, Seed[]]) => {
   const found = await payload.find({ collection: 'glossary-terms', depth: 0, limit: 1, where: { canonicalKey: { equals: canonicalKey } } })
   const existing = found.docs[0] as any
   const enTerms = [...new Set(variants.map(({ en }) => en))]
@@ -67,6 +67,11 @@ for (const [canonicalKey, variants] of concepts) {
     await payload.update({ collection: 'glossary-terms', id: existing.id, data: { translations } })
     updated += 1
   }
+}
+const entries = [...concepts.entries()]
+for (let offset = 0; offset < entries.length; offset += 20) {
+  await Promise.all(entries.slice(offset, offset + 20).map(upsertConcept))
+  if ((offset + 20) % 200 === 0) console.log(`Processed ${Math.min(offset + 20, entries.length)}/${entries.length}`)
 }
 console.log(`Glossary import complete: ${created} created, ${updated} merged.`)
 process.exit(0)
