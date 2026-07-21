@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload';
 
 import { createSeoField } from '../fields/seo';
-import { authenticated, publishedOrAuthenticated } from '../access/authenticated';
+import { authenticated, ssgPublishedOrAuthenticated } from '../access/authenticated';
 
 export const Trainings: CollectionConfig = {
   slug: 'trainings',
@@ -23,7 +23,7 @@ export const Trainings: CollectionConfig = {
     group: 'Content',
   },
   access: {
-    read: publishedOrAuthenticated,
+    read: ssgPublishedOrAuthenticated,
     create: authenticated,
     update: authenticated,
     delete: authenticated,

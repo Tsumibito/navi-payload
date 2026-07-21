@@ -21,6 +21,7 @@ const positiveInteger = (name: string, fallback: number): number => {
 
 export const env = {
   payloadSecret: required('PAYLOAD_SECRET'),
+  ssgApiKey: required('PAYLOAD_SSG_API_KEY'),
   databaseUri: required('DATABASE_URI'),
   databaseSchema: process.env.PAYLOAD_DB_SCHEMA?.trim() || 'navi',
   serverUrl: url('PAYLOAD_PUBLIC_SERVER_URL', 'http://localhost:3000'),

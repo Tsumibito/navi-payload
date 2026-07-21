@@ -17,6 +17,7 @@ ENV NODE_ENV=production
 # credentials are never needed at this stage; they are decrypted only when the
 # container starts. These placeholders exist for config validation during build.
 RUN PAYLOAD_SECRET=build-only-placeholder-not-used-at-runtime \
+  PAYLOAD_SSG_API_KEY=build-only-placeholder-not-used-at-runtime \
   DATABASE_URI=postgresql://build:build@127.0.0.1:5432/build \
   CLOUDFLARE_R2_ACCESS_KEY_ID=build-placeholder \
   CLOUDFLARE_R2_SECRET_ACCESS_KEY=build-placeholder \

@@ -3,7 +3,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 
 import { contentEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
-import { authenticated } from '../access/authenticated';
+import { authenticated, ssgOrAuthenticated } from '../access/authenticated';
 import { createPublicSlugField } from '../fields/publicSlug';
 
 export const Certificates: CollectionConfig = {
@@ -19,7 +19,7 @@ export const Certificates: CollectionConfig = {
     group: 'Content',
   },
   access: {
-    read: () => true,
+    read: ssgOrAuthenticated,
     create: authenticated,
     update: authenticated,
     delete: authenticated,
