@@ -1035,12 +1035,25 @@ export interface GlossaryTerm {
     | 'charter'
     | 'certification';
   status: 'proposed' | 'approved' | 'deprecated';
+  /**
+   * Only approved concepts in the published release may be exposed by the SSG API.
+   */
+  release: 'backlog' | 'mvp' | 'published';
+  /**
+   * Reuses existing blog taxonomy so tag pages can render a Yachting encyclopedia block.
+   */
+  categories?: (number | TagsNew)[] | null;
+  illustration?: (number | null) | Media;
   translations: {
     /**
      * BCP-47 code: ru, uk, en, fr, es, de, pl, etc. Adding a language does not require a DB migration.
      */
     locale: string;
     term: string;
+    /**
+     * Localized encyclopedia route segment. Existing routes are never derived from this field.
+     */
+    slug?: string | null;
     aliases?:
       | {
           value: string;
@@ -1048,7 +1061,11 @@ export interface GlossaryTerm {
         }[]
       | null;
     definition?: string | null;
+    encyclopediaText?: string | null;
     usageNotes?: string | null;
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    imageAlt?: string | null;
     forbiddenVariants?:
       | {
           value: string;
@@ -1060,6 +1077,21 @@ export interface GlossaryTerm {
     confidence?: number | null;
     id?: string | null;
   }[];
+  /**
+   * Required provenance ledger. AI may normalize source material but must not erase its origin or reuse restrictions.
+   */
+  sources?:
+    | {
+        name: string;
+        url?: string | null;
+        sourceRecordId?: string | null;
+        reusePolicy: 'ingest' | 'attribution' | 'reference-only' | 'unknown';
+        license?: string | null;
+        retrievedAt?: string | null;
+        notes?: string | null;
+        id?: string | null;
+      }[]
+    | null;
   evidencePosts?: (number | PostsNew)[] | null;
   editorNotes?: string | null;
   updatedAt: string;
@@ -1615,11 +1647,15 @@ export interface GlossaryTermsSelect<T extends boolean = true> {
   canonicalKey?: T;
   domain?: T;
   status?: T;
+  release?: T;
+  categories?: T;
+  illustration?: T;
   translations?:
     | T
     | {
         locale?: T;
         term?: T;
+        slug?: T;
         aliases?:
           | T
           | {
@@ -1627,7 +1663,11 @@ export interface GlossaryTermsSelect<T extends boolean = true> {
               id?: T;
             };
         definition?: T;
+        encyclopediaText?: T;
         usageNotes?: T;
+        seoTitle?: T;
+        seoDescription?: T;
+        imageAlt?: T;
         forbiddenVariants?:
           | T
           | {
@@ -1637,6 +1677,18 @@ export interface GlossaryTermsSelect<T extends boolean = true> {
         status?: T;
         provenance?: T;
         confidence?: T;
+        id?: T;
+      };
+  sources?:
+    | T
+    | {
+        name?: T;
+        url?: T;
+        sourceRecordId?: T;
+        reusePolicy?: T;
+        license?: T;
+        retrievedAt?: T;
+        notes?: T;
         id?: T;
       };
   evidencePosts?: T;

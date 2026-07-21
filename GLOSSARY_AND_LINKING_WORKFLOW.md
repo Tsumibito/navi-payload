@@ -21,6 +21,20 @@ Anchors must occur verbatim in the source article. Duplicate URLs and unpublishe
 
 AI never publishes an article. New and regenerated content stops at editorial review, and glossary suggestions stop at `proposed`.
 
+## Encyclopedia MVP
+
+The first public release is deliberately limited to 100–150 editorially selected concepts. The existing imported corpus remains in `backlog`; candidates move through `mvp` and only an approved concept in the `published` release is exposed to the Astro SSG build. One concept can have any number of BCP-47 language rows, and each language row owns its route slug, short definition, encyclopedia text, SEO copy and image alt text.
+
+Glossary concepts reuse the existing `tags-new` taxonomy instead of creating a parallel category system. A concept can belong to several existing blog tags/categories. Tag pages may render a **Yachting encyclopedia** block containing published concepts from that tag, while encyclopedia pages link back to relevant tag hubs, posts and courses.
+
+Source material is merged at the concept/sense level, never by concatenating strings. DeepSeek or another configured OpenRouter model may classify, deduplicate, translate and rewrite source records, but every result retains a field-level source ledger: source URL or record ID, retrieval date, license and reuse policy. `reference-only` material may inform validation but must not be reproduced. AI output is a derived proposal, not a substitute for provenance or license review.
+
+Recommended MVP languages are the currently supported site languages (`ru`, `uk`, `en`). The schema already supports later `fr`, `es`, `de`, `pl` and other locales without migrations. A language version is published only when its translation, definition, slug, SEO copy and terminology have passed review; missing languages must not silently fall back to Russian on public encyclopedia routes.
+
+## Deferred: community submissions
+
+After the MVP dictionary is stable, add a separate `glossary-submissions` moderation queue. Visitors will be able to propose a term, translation, correction or source. Deterministic validation and an LLM will detect duplicates, assess evidence and prepare a merge diff; only an editor can approve the change. The public form will require rate limiting, Turnstile, an audit trail and a contributor license declaration. This collection and public form are intentionally not part of the MVP.
+
 ## Source import
 
 After the glossary migration is deployed:

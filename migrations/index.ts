@@ -4,6 +4,7 @@ import * as migration_20260721_134147_training_certificates_ssg from './20260721
 import * as migration_20260721_163943_post_localization_workflow from './20260721_163943_post_localization_workflow';
 import * as migration_20260721_165400_trainings_seo_alignment from './20260721_165400_trainings_seo_alignment';
 import * as migration_20260721_172549_glossary_intelligence from './20260721_172549_glossary_intelligence';
+import * as migration_20260721_175821_glossary_encyclopedia_mvp from './20260721_175821_glossary_encyclopedia_mvp';
 
 export const migrations = [
   {
@@ -34,6 +35,11 @@ export const migrations = [
   {
     up: migration_20260721_172549_glossary_intelligence.up,
     down: migration_20260721_172549_glossary_intelligence.down,
-    name: '20260721_172549_glossary_intelligence'
+    name: '20260721_172549_glossary_intelligence',
+  },
+  {
+    up: migration_20260721_175821_glossary_encyclopedia_mvp.up,
+    down: migration_20260721_175821_glossary_encyclopedia_mvp.down,
+    name: '20260721_175821_glossary_encyclopedia_mvp'
   },
 ];
