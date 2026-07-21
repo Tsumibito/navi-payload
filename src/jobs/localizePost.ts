@@ -5,7 +5,7 @@ import { generateSlug } from '../utils/slug'
 
 type LexicalNode = { type?: string; text?: string; children?: LexicalNode[]; [key: string]: unknown }
 
-const model = process.env.OPENROUTER_LOCALIZATION_MODEL || 'openai/gpt-4.1-mini'
+const OPENROUTER_LOCALIZATION_MODEL = 'openai/gpt-5.6-luna'
 
 async function openRouterJSON(system: string, prompt: string): Promise<Record<string, any>> {
   const token = process.env.OPENROUTER_TOKEN?.trim()
@@ -19,7 +19,7 @@ async function openRouterJSON(system: string, prompt: string): Promise<Record<st
       'X-Title': 'Navi.training Payload localization',
     },
     body: JSON.stringify({
-      model,
+      model: OPENROUTER_LOCALIZATION_MODEL,
       temperature: 0.15,
       response_format: { type: 'json_object' },
       messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],

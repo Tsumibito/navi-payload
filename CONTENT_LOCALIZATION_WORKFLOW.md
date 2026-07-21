@@ -33,4 +33,4 @@ Add one entry to `src/config/contentLocales.ts` and redeploy/migrate Payload. Th
 
 Payload's durable Jobs Queue runs one localization job at a time every minute. Each job retries twice, and concurrency is keyed by post ID. This avoids blocking the admin save request and prevents simultaneous translations from overwriting one another.
 
-Production must provide `OPENROUTER_TOKEN`. Optional `OPENROUTER_LOCALIZATION_MODEL` defaults to `openai/gpt-4.1-mini`.
+Production must provide only the secret `OPENROUTER_TOKEN`. The non-secret localization model is configured in code as `openai/gpt-5.6-luna`.
