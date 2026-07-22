@@ -86,6 +86,28 @@ export const Posts: CollectionConfig = {
         });
         return doc;
       },
+      async ({ context, doc, previousDoc, req }) => {
+        if (context.skipLinkIndexQueue) return doc;
+        const wasPublished = previousDoc?.publicationStatus === 'published';
+        const isPublished = doc.publicationStatus === 'published';
+        if (!wasPublished && !isPublished) return doc;
+
+        const watchedFields = ['name', 'slug', 'publicSlug', 'content', 'summary', 'tags', 'publicationStatus'] as const;
+        const changed = !previousDoc || watchedFields.some((field) => JSON.stringify(doc[field]) !== JSON.stringify(previousDoc[field]));
+        if (!changed) return doc;
+
+        await req.payload.jobs.queue({
+          task: 'sync-link-index' as never,
+          queue: 'link-index',
+          input: { postId: Number(doc.id) } as never,
+        });
+        // Run only after a content change. There is deliberately no polling
+        // worker, so an idle Payload instance still lets Neon scale to zero.
+        void req.payload.jobs.run({ queue: 'link-index', limit: 1 }).catch((error) => {
+          req.payload.logger.error({ err: error, postId: doc.id }, 'Incremental link-index worker failed');
+        });
+        return doc;
+      },
     ],
   },
   fields: [

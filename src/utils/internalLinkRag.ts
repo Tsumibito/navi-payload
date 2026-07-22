@@ -286,6 +286,38 @@ export async function syncPostLinkIndex(payload: any, post: any, locale: Content
   return { indexed: passages.length, embedded: changed.length, links: linkCount }
 }
 
+/** Remove a post from the active semantic index and link graph. */
+export async function purgePostLinkIndex(payload: any, postId: number, locale?: ContentLocale): Promise<void> {
+  const pool = payload.db?.pool
+  if (!pool?.query) throw new Error('Payload Postgres pool is unavailable')
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    if (locale) {
+      await client.query('DELETE FROM navi.link_passages WHERE post_id = $1 AND locale = $2', [postId, locale])
+      await client.query(
+        `DELETE FROM navi.internal_links
+          WHERE source_locale = $2 AND (source_post_id = $1 OR target_post_id = $1)
+            AND state <> 'rejected'`,
+        [postId, locale],
+      )
+    } else {
+      await client.query('DELETE FROM navi.link_passages WHERE post_id = $1', [postId])
+      await client.query(
+        `DELETE FROM navi.internal_links
+          WHERE (source_post_id = $1 OR target_post_id = $1) AND state <> 'rejected'`,
+        [postId],
+      )
+    }
+    await client.query('COMMIT')
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
 export async function backfillLinkIndex(payload: any, options: {
   cursor?: number
   limit?: number

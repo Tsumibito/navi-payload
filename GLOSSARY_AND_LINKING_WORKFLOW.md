@@ -31,6 +31,8 @@ For a new page, hybrid retrieval combines vector similarity, tag overlap and lex
 
 Embeddings use OpenRouter and `baai/bge-m3` through the existing `OPENROUTER_TOKEN`; `OPENROUTER_EMBEDDING_MODEL` can override the model without changing code. No separate Workers AI credential is required. The authenticated `/api/internal-link-index` endpoint backfills published posts in bounded batches and reports graph/index totals.
 
+Publishing a post, changing indexed content on a published post, or taking it out of publication automatically queues a per-post incremental index job. The job refreshes every available language, embeds only blocks whose content hash or embedding model changed, rebuilds the affected graph edges, and removes inactive passages on unpublish. Jobs are started by the editor action itself rather than by a permanent polling process, preserving Neon scale-to-zero while retaining durable queued work and bounded retries.
+
 ## Encyclopedia MVP
 
 The first public release is deliberately limited to 100–150 editorially selected concepts. The existing imported corpus remains in `backlog`; candidates move through `mvp` and only an approved concept in the `published` release is exposed to the Astro SSG build. One concept can have any number of BCP-47 language rows, and each language row owns its route slug, short definition, encyclopedia text, SEO copy and image alt text.

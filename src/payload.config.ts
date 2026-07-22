@@ -19,6 +19,7 @@ import { Pages } from './content/Pages'
 import { env } from './config/env'
 import { CONTENT_LOCALES } from './config/contentLocales'
 import { localizePostTask } from './jobs/localizePost'
+import { syncLinkIndexTask } from './jobs/syncLinkIndex'
 import { GlossaryTerms } from './collections/GlossaryTerms'
 import { Leads } from './collections/Leads'
 import { Subscribers } from './collections/Subscribers'
@@ -89,6 +90,6 @@ export default buildConfig({
   },
   jobs: {
     enableConcurrencyControl: true,
-    tasks: [localizePostTask],
+    tasks: [localizePostTask, syncLinkIndexTask],
   },
 })
