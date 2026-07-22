@@ -27,7 +27,8 @@ try {
   }
   payload.logger.info(totals, 'Internal-link index backfill completed')
 } finally {
-  await (payload.db as any)?.pool?.end?.()
+  const closing = (payload.db as any)?.pool?.end?.()
+  if (closing) await Promise.race([closing, new Promise((resolve) => setTimeout(resolve, 2_000))])
 }
 
 // Payload keeps a few background handles alive after initialization. This is

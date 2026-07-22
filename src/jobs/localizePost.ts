@@ -48,6 +48,7 @@ async function openRouterJSON(system: string, prompt: string, model = localizati
       model,
       temperature: 0.15,
       max_tokens: maxTokens,
+      reasoning: { effort: 'low', exclude: true },
       response_format: { type: 'json_object' },
       messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
     }),
@@ -57,6 +58,17 @@ async function openRouterJSON(system: string, prompt: string, model = localizati
   const content = body.choices?.[0]?.message?.content
   if (!content) throw new Error('OpenRouter returned an empty response')
   return JSON.parse(content)
+}
+
+async function openRouterLinkJSON(system: string, prompt: string, maxTokens = 4_096): Promise<Record<string, any>> {
+  const primary = linkingModel()
+  try {
+    return await openRouterJSON(system, prompt, primary, maxTokens)
+  } catch (error) {
+    const fallback = editorialModel()
+    if (fallback === primary) throw error
+    return openRouterJSON(system, prompt, fallback, maxTokens)
+  }
 }
 
 async function generateHeroImage(payload: any, prompt: string, title: string) {
@@ -251,9 +263,9 @@ async function generateLinkPlan(payload: any, post: any, locale: ContentLocale) 
     id: passage.postId, title: passage.title, slug: passage.slug,
     relevantPassage: passage.content, score: Number(passage.hybridScore.toFixed(4)),
   }])).values()].slice(0, 8)
-  const response = await openRouterJSON(
+  const response = await openRouterLinkJSON(
     `You design useful topic-cluster internal links for a sailing school. Select 2-6 links from the source passages to the supplied target pages. Use no more than one link per source passage and one per target. The anchor must be an exact natural phrase already present verbatim in that source passage, 2-7 words, descriptive without keyword stuffing. Do not place a link in a passage that already contains one. Return JSON {"links":[{"targetId":1,"sourceNodePath":"0.2","anchor":"exact text","reason":"reader benefit"}]}.`,
-    JSON.stringify({ sourcePassages: sourcePassages.map((passage) => ({ nodePath: passage.nodePath, heading: passage.heading, text: passage.content.slice(0, 1_200) })), targets }), linkingModel(), 1_600,
+    JSON.stringify({ sourcePassages: sourcePassages.map((passage) => ({ nodePath: passage.nodePath, heading: passage.heading, text: passage.content.slice(0, 1_200) })), targets }),
   )
   const byId = new Map(targets.map((target) => [String(target.id), target]))
   const byPath = new Map(sourcePassages.map((passage) => [passage.nodePath, passage]))
@@ -279,12 +291,12 @@ async function generateInboundLinkPlan(payload: any, target: any, locale: Conten
   const targetURL = `/${prefix}/blog/${targetSlug}/`
   const sources = await retrieveRelatedPassages(payload, target, locale, 12)
   if (!sources.length) return []
-  const response = await openRouterJSON(
+  const response = await openRouterLinkJSON(
     `Select 2-5 published sailing passages that should link to the new target article. For every source choose one exact natural 2-7 word anchor phrase already present verbatim in that single passage. Do not rewrite the paragraph, invent an anchor or select a passage that already has a link. Prefer different source pages and genuine reader value over SEO repetition. Return JSON {"links":[{"sourcePostId":1,"sourceNodePath":"0.2","anchor":"exact phrase","reason":"reader benefit"}]}.`,
     JSON.stringify({
       target: { title: target.name, summary: target.summary, url: targetURL },
       sources: sources.map((source) => ({ postId: source.postId, title: source.title, nodePath: source.nodePath, heading: source.heading, passage: source.content.slice(0, 1_200), score: Number(source.hybridScore.toFixed(4)) })),
-    }), linkingModel(), 1_600,
+    }),
   )
   const byKey = new Map(sources.map((source) => [`${source.postId}:${source.nodePath}`, source]))
   const links = (Array.isArray(response.links) ? response.links : []).flatMap((link: any) => {
@@ -547,8 +559,15 @@ export const localizePostTask: TaskConfig<any> = {
     const sourceFAQs = (runSourceEditorial && (fieldScope === 'all' || fieldScope === 'faq')) || (runTranslations && !existingSourceFAQs.length)
       ? await generateFAQs(source.content, sourceLocale, sourceGlossary)
       : existingSourceFAQs
+    if (runTaxonomyLinks) await reportStage(`Planning outbound links for ${sourceLocale.toUpperCase()}`)
     const sourceLinkPlan = runTaxonomyLinks ? await generateLinkPlan(req.payload, source, sourceLocale) : (source.localizationWorkflow?.linkPlan || [])
+    if (runTaxonomyLinks) await reportStage(`Planning incoming links for ${sourceLocale.toUpperCase()}`)
     const sourceInboundLinkPlan = runTaxonomyLinks ? await generateInboundLinkPlan(req.payload, source, sourceLocale) : (source.localizationWorkflow?.inboundLinkPlan || [])
+    source.localizationWorkflow = {
+      ...(source.localizationWorkflow || {}),
+      linkPlan: sourceLinkPlan,
+      inboundLinkPlan: sourceInboundLinkPlan,
+    }
     if (runTaxonomyLinks && source.publicationStatus === 'published') await applyInboundLinks(req.payload, sourceInboundLinkPlan, sourceLocale)
     const sourceContent = runTaxonomyLinks ? applyLinkPlan(source.content, sourceLinkPlan) : source.content
     if (runSourceEditorial && fieldScope === 'all') assertLocalizedResult({ locale: sourceLocale, post: { ...source, content: sourceContent }, editorial: sourceEditorial, faqs: sourceFAQs, linkPlan: sourceLinkPlan })

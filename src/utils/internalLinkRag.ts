@@ -499,6 +499,7 @@ export async function retrieveRelatedPassages(
        JOIN navi.posts_new p ON p.id = lp.post_id
        JOIN navi.posts_new_locales pl ON pl._parent_id = p.id AND pl._locale::text = $1
       WHERE lp.locale = $1 AND lp.post_id <> $2 AND p.publication_status = 'published'
+        AND $4::text IS NOT NULL
         AND lp.embedding_model = $5
         AND jsonb_array_length(lp.existing_links) < 2
         AND NOT EXISTS (
