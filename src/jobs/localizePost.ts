@@ -253,19 +253,33 @@ async function generateFAQs(content: unknown, locale: ContentLocale, glossary = 
 }
 
 async function generateLinkPlan(payload: any, post: any, locale: ContentLocale) {
-  const related = await retrieveRelatedPassages(payload, post, locale, 14, 'outbound')
+  const allPassages = extractLinkPassages(post.content)
+  const existingInternalLinks = new Set(allPassages.flatMap((passage) => passage.existingLinks.flatMap((link) => {
+    try {
+      const url = new URL(link.url, 'https://navi.training')
+      return ['navi.training', 'www.navi.training'].includes(url.hostname) ? [`${url.pathname}${url.search}${url.hash}`] : []
+    } catch { return [] }
+  })))
+  const wordCount = lexicalPlainText(post.content).split(/\s+/).filter(Boolean).length
+  const minimumTotal = 4
+  const maximumTotal = wordCount >= 2_500 ? 12 : wordCount >= 1_500 ? 9 : wordCount >= 800 ? 7 : 5
+  const minimumNew = Math.max(0, minimumTotal - existingInternalLinks.size)
+  const maximumNew = Math.max(0, maximumTotal - existingInternalLinks.size)
+  if (!maximumNew) return []
+
+  const related = await retrieveRelatedPassages(payload, post, locale, Math.min(36, Math.max(20, maximumNew * 3)), 'outbound')
   if (!related.length) return []
-  const sourcePassages = extractLinkPassages(post.content)
+  const sourcePassages = allPassages
     .filter((passage) => !passage.existingLinks.length && passage.content.length >= 70)
-    .slice(0, 18)
+    .slice(0, Math.min(36, Math.max(24, maximumNew * 3)))
   if (!sourcePassages.length) return []
   const targets = [...new Map(related.map((passage) => [passage.postId, {
     id: passage.postId, title: passage.title, slug: passage.slug,
     relevantPassage: passage.content, score: Number(passage.hybridScore.toFixed(4)),
-  }])).values()].slice(0, 8)
+  }])).values()].slice(0, Math.min(16, maximumNew + 6))
   const response = await openRouterLinkJSON(
-    `You design useful topic-cluster internal links for a sailing school. Select 2-6 links from the source passages to the supplied target pages. Use no more than one link per source passage and one per target. The anchor must be an exact natural phrase already present verbatim in that source passage, 2-7 words, descriptive without keyword stuffing. Do not place a link in a passage that already contains one. Return JSON {"links":[{"targetId":1,"sourceNodePath":"0.2","anchor":"exact text","reason":"reader benefit"}]}.`,
-    JSON.stringify({ sourcePassages: sourcePassages.map((passage) => ({ nodePath: passage.nodePath, heading: passage.heading, text: passage.content.slice(0, 1_200) })), targets }),
+    `You design useful topic-cluster internal links for a sailing school. The article already has ${existingInternalLinks.size} internal links. Select ${minimumNew}-${maximumNew} additional links when that many genuinely useful matches exist, so the finished long-form article contains 4-12 internal links according to its length. Use no more than one link per source passage and one per target. The anchor must be an exact, case-sensitive natural phrase already present verbatim in that source passage, 2-7 words, descriptive without keyword stuffing. Do not place a link in a passage that already contains one. Return JSON {"links":[{"targetId":1,"sourceNodePath":"0.2","anchor":"exact text","reason":"reader benefit"}]}.`,
+    JSON.stringify({ desired: { minimumNew, maximumNew, minimumTotal, maximumTotal }, sourcePassages: sourcePassages.map((passage) => ({ nodePath: passage.nodePath, heading: passage.heading, text: passage.content.slice(0, 1_200) })), targets }),
   )
   const byId = new Map(targets.map((target) => [String(target.id), target]))
   const byPath = new Map(sourcePassages.map((passage) => [passage.nodePath, passage]))
@@ -279,7 +293,7 @@ async function generateLinkPlan(payload: any, post: any, locale: ContentLocale) 
       sourceContentHash: passage.contentHash, targetId: target.id, targetPostId: target.id,
       url: `/${prefix}/blog/${target.slug}/`, relevanceScore: Number(target.score || 0),
     }]
-  }).slice(0, 6)
+  }).slice(0, maximumNew)
   await recordLinkSuggestions(payload, links, locale)
   return links
 }
@@ -339,7 +353,7 @@ function assertLocalizedResult(args: { locale: ContentLocale; post: any; editori
   if (!args.editorial?.seoTitle || !args.editorial?.metaDescription || !args.editorial?.focusKeyphrase || !args.editorial?.imageAlt) throw new Error(`${args.locale}: editorial fields are incomplete`)
   if (String(args.editorial.seoTitle).length > 65 || String(args.editorial.metaDescription).length < 100 || String(args.editorial.metaDescription).length > 175) throw new Error(`${args.locale}: invalid SEO lengths`)
   if (validFAQs(args.faqs).length < 4) throw new Error(`${args.locale}: fewer than four valid FAQs`)
-  if (args.linkPlan.length > 6) throw new Error(`${args.locale}: too many outgoing links`)
+  if (args.linkPlan.length > 12) throw new Error(`${args.locale}: too many outgoing links`)
 }
 
 async function applyInboundLinks(payload: any, plan: any[], locale: ContentLocale) {

@@ -23,6 +23,14 @@ export const GlossaryTerms: CollectionConfig = {
         translation.locale = normalizeLocale(translation.locale)
         if (!/^[a-z]{2,3}(-[a-z0-9]{2,8})*$/.test(translation.locale)) throw new Error(`Invalid glossary locale: ${translation.locale}`)
         if (seen.has(translation.locale)) throw new Error(`Duplicate glossary locale: ${translation.locale}`)
+        if (data.release === 'published' && translation.status === 'approved' && translation.encyclopediaText?.trim()) {
+          const routeLocale = translation.locale === 'uk' ? 'ua' : translation.locale
+          const links = [...String(translation.encyclopediaText).matchAll(/\[[^\]]+\]\((\/[^)]+)\)/g)].map((match) => match[1])
+          const valid = links.filter((url) => new RegExp(`^/${routeLocale}/(?:blog|tags|encyclopedia)/`).test(url))
+          if (valid.length < 1 || valid.length > 3 || valid.length !== links.length) {
+            throw new Error(`${translation.locale}: published encyclopedia text requires 1-3 localized internal links`)
+          }
+        }
         seen.add(translation.locale)
       }
       return { ...data, canonicalKey: String(data.canonicalKey || '').trim().toLowerCase(), translations }

@@ -43,7 +43,7 @@ function evidenceFor(locale: Locale, categoryId: number | undefined, key: string
     const text = `${post.name || ''}. ${post.summary || ''}. ${extractTextFromLexical(post.content)}`.replace(/\s+/g, ' ').trim()
     const score = (categoryId && relationIds(post.tags).includes(categoryId) ? 10 : 0) + (text.toLowerCase().includes(key.toLowerCase()) ? 5 : 0)
     return { score, id: post.id, title: post.name, url: `/${routeLocales[locale]}/blog/${post.publicSlug || post.slug}/`, excerpt: text.slice(0, 1800) }
-  }).filter((item) => item.score > 0 && item.title && item.excerpt).sort((a, b) => b.score - a.score).slice(0, 2).map(({ score: _, ...item }) => item)
+  }).filter((item) => item.score > 0 && item.title && item.excerpt).sort((a, b) => b.score - a.score).slice(0, 3).map(({ score: _, ...item }) => item)
 }
 
 async function wikipediaEvidence(query: string) {
@@ -64,7 +64,7 @@ function validateTranslation(locale: Locale, item: any, allowedUrls: Set<string>
   const links = [...String(item.encyclopediaText).matchAll(/\[[^\]]+\]\(([^)]+)\)/g)].map((match) => match[1])
   const normalizeUrl = (url: string) => url.replace(/\/$/, '')
   const normalizedAllowed = new Set([...allowedUrls].map(normalizeUrl))
-  if (links.length < 1 || links.length > 2 || links.some((url) => !normalizedAllowed.has(normalizeUrl(url)))) throw new Error(`${locale}: invalid internal links ${links.join(', ')}`)
+  if (links.length < 1 || links.length > 3 || links.some((url) => !normalizedAllowed.has(normalizeUrl(url)))) throw new Error(`${locale}: invalid internal links ${links.join(', ')}`)
   if (String(item.seoTitle).length > 65 || String(item.seoDescription).length < 100 || String(item.seoDescription).length > 170) throw new Error(`${locale}: invalid SEO lengths`)
 }
 
@@ -75,13 +75,16 @@ async function generateOne([canonicalKey, categorySlug]: typeof candidates[numbe
   const evidence = Object.fromEntries((['ru', 'uk', 'en'] as Locale[]).map((locale) => [locale, evidenceFor(locale, categoryId, canonicalKey)])) as Record<Locale, Evidence[]>
   if ((['ru', 'uk', 'en'] as Locale[]).some((locale) => !evidence[locale].length)) throw new Error(`${canonicalKey}: insufficient article evidence`)
   const wiki = await wikipediaEvidence(canonicalKey)
-  const allowedUrls = Object.fromEntries((['ru', 'uk', 'en'] as Locale[]).map((locale) => [locale, new Set(evidence[locale].map(({ url }) => url))])) as Record<Locale, Set<string>>
+  const allowedUrls = Object.fromEntries((['ru', 'uk', 'en'] as Locale[]).map((locale) => [locale, new Set([
+    ...evidence[locale].map(({ url }) => url),
+    `/${routeLocales[locale]}/tags/${categorySlug}/`,
+  ])])) as Record<Locale, Set<string>>
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://navi.training', 'X-Title': 'Navi.training Yachting Encyclopedia' },
     body: JSON.stringify({ model, temperature: 0.15, response_format: { type: 'json_object' }, messages: [
-      { role: 'system', content: `You edit “Navi.training Yachting Encyclopedia”. Write independent Russian, Ukrainian and English entries for one precise sailing concept. Each encyclopediaText must be 150–300 words, factually conservative and useful in practice. Define all measurements exactly and distinguish homonyms. Use Navi.training excerpts as house terminology and the supplied Wikipedia introduction only as an attributed reference. In EACH article insert 1–2 natural inline Markdown links to the supplied Navi.training articles, using ONLY their exact relative URLs; distribute links contextually, never collect them at the end. Return JSON {"domain":"...","translations":{"ru":{"term":"","slug":"","definition":"","encyclopediaText":"","usageNotes":"","seoTitle":"","seoDescription":"","imageAlt":""},"uk":{...},"en":{...}}}. Slugs are URL-safe Latin transliterations. SEO title <=60 chars; description 120–160 chars. Do not add external links or citations to prose.` },
-      { role: 'user', content: JSON.stringify({ canonicalKey, category: categorySlug, naviEvidence: evidence, wikipedia: wiki }) },
+      { role: 'system', content: `You edit “Navi.training Yachting Encyclopedia”. Write independent Russian, Ukrainian and English entries for one precise sailing concept. Each encyclopediaText must be 150–300 words, factually conservative and useful in practice. Define all measurements exactly and distinguish homonyms. Use Navi.training excerpts as house terminology and the supplied Wikipedia introduction only as an attributed factual reference. In EACH article insert 1–3 natural inline Markdown links chosen only from allowedInternalUrls. Prefer useful blog explanations; a topic tag is appropriate when it helps further exploration. Distribute links contextually, never collect them at the end. Return JSON {"domain":"...","translations":{"ru":{"term":"","slug":"","definition":"","encyclopediaText":"","usageNotes":"","seoTitle":"","seoDescription":"","imageAlt":""},"uk":{...},"en":{...}}}. Slugs are URL-safe Latin transliterations. SEO title <=60 chars; description 120–160 chars. Do not add external links or citations to prose.` },
+      { role: 'user', content: JSON.stringify({ canonicalKey, category: categorySlug, naviEvidence: evidence, allowedInternalUrls: Object.fromEntries((['ru','uk','en'] as Locale[]).map((locale) => [locale, [...allowedUrls[locale]]])), wikipedia: wiki }) },
     ] }),
   })
   if (!response.ok) throw new Error(`${canonicalKey}: OpenRouter ${response.status} ${(await response.text()).slice(0, 400)}`)
