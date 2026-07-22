@@ -5,6 +5,13 @@ import { CONTENT_LOCALES, type ContentLocale, YACHTING_GLOSSARY } from '../confi
 import { buildSeoContentContext, enrichKeywordEntries, serializeKeywords, type AdditionalFieldsValue } from '../utils/seoAnalysis'
 import { generateSlug } from '../utils/slug'
 import { generatePostSocialImages } from '../utils/socialImages'
+import {
+  applyLinkSuggestion,
+  extractLinkPassages,
+  recordLinkSuggestions,
+  retrieveRelatedPassages,
+  syncPostLinkIndex,
+} from '../utils/internalLinkRag'
 
 type LexicalNode = { type?: string; text?: string; children?: LexicalNode[]; [key: string]: unknown }
 type GlossaryTranslation = { locale?: string; term?: string; aliases?: Array<{ value?: string }>; definition?: string; usageNotes?: string; forbiddenVariants?: Array<{ value?: string }>; status?: string }
@@ -22,7 +29,7 @@ function imageModel() {
   return process.env.OPENROUTER_IMAGE_MODEL?.trim() || 'google/gemini-3.1-flash-image'
 }
 
-async function openRouterJSON(system: string, prompt: string, model = localizationModel()): Promise<Record<string, any>> {
+async function openRouterJSON(system: string, prompt: string, model = localizationModel(), maxTokens = 8_192): Promise<Record<string, any>> {
   const token = process.env.OPENROUTER_TOKEN?.trim()
   if (!token) throw new Error('OPENROUTER_TOKEN is not configured')
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -36,6 +43,7 @@ async function openRouterJSON(system: string, prompt: string, model = localizati
     body: JSON.stringify({
       model,
       temperature: 0.15,
+      max_tokens: maxTokens,
       response_format: { type: 'json_object' },
       messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
     }),
@@ -229,66 +237,63 @@ async function generateFAQs(content: unknown, locale: ContentLocale, glossary = 
 }
 
 async function generateLinkPlan(payload: any, post: any, locale: ContentLocale) {
-  const tagIds = (post.tags || []).map((tag: any) => typeof tag === 'object' ? tag.value?.id || tag.id || tag.value : tag)
-  if (!tagIds.length) return []
-  const tagSet = new Set(tagIds.map(String))
-  const result = await payload.find({
-    collection: 'posts-new', locale, fallbackLocale: false, depth: 0, limit: 200,
-    where: { and: [{ id: { not_equals: post.id } }, { publicationStatus: { equals: 'published' } }] },
-  })
-  // `tags` is a polymorphic relationship in the legacy schema. Payload's query builder
-  // throws "Not supported" for an `in` constraint, so filter the bounded result in memory.
-  const candidateDocs = result.docs.filter((doc: any) => (doc.tags || []).some((tag: any) => {
-    const id = typeof tag === 'object' ? tag.value?.id || tag.id || tag.value : tag
-    return id != null && tagSet.has(String(id))
-  })).slice(0, 30)
-  const sourceText = collectTextNodes(structuredClone(post.content)).map(({ node }) => node.text).join(' ').slice(0, 20_000)
+  const related = await retrieveRelatedPassages(payload, post, locale, 14, 'outbound')
+  if (!related.length) return []
+  const sourcePassages = extractLinkPassages(post.content)
+    .filter((passage) => !passage.existingLinks.length && passage.content.length >= 70)
+    .slice(0, 18)
+  if (!sourcePassages.length) return []
+  const targets = [...new Map(related.map((passage) => [passage.postId, {
+    id: passage.postId, title: passage.title, slug: passage.slug,
+    relevantPassage: passage.content, score: Number(passage.hybridScore.toFixed(4)),
+  }])).values()].slice(0, 8)
   const response = await openRouterJSON(
-    `You design useful topic-cluster internal links for a sailing school. Select 2-6 genuinely relevant links, distributed through the article rather than grouped at the end. An anchor must be an exact natural phrase already present in the article. Avoid duplicate targets and commercial over-optimization. Return JSON {"links":[{"targetId":1,"anchor":"exact text","reason":"...","sectionHint":"..."}]}.`,
-    JSON.stringify({ article: sourceText, candidates: candidateDocs.map((doc: any) => ({ id: doc.id, title: doc.name, slug: doc.publicSlug || doc.slug, summary: doc.summary })) }), editorialModel(),
+    `You design useful topic-cluster internal links for a sailing school. Select 2-6 links from the source passages to the supplied target pages. Use no more than one link per source passage and one per target. The anchor must be an exact natural phrase already present verbatim in that source passage, 2-7 words, descriptive without keyword stuffing. Do not place a link in a passage that already contains one. Return JSON {"links":[{"targetId":1,"sourceNodePath":"0.2","anchor":"exact text","reason":"reader benefit"}]}.`,
+    JSON.stringify({ sourcePassages: sourcePassages.map((passage) => ({ nodePath: passage.nodePath, heading: passage.heading, text: passage.content.slice(0, 1_200) })), targets }), editorialModel(), 1_600,
   )
-  const byId = new Map(candidateDocs.map((doc: any) => [String(doc.id), doc]))
+  const byId = new Map(targets.map((target) => [String(target.id), target]))
+  const byPath = new Map(sourcePassages.map((passage) => [passage.nodePath, passage]))
   const prefix = locale === 'uk' ? 'ua' : locale
-  return (Array.isArray(response.links) ? response.links : []).flatMap((link: any) => {
+  const links = (Array.isArray(response.links) ? response.links : []).flatMap((link: any) => {
     const target: any = byId.get(String(link.targetId))
-    const slug = target?.publicSlug || target?.slug
-    if (!target || !slug || typeof link.anchor !== 'string') return []
-    return [{ ...link, targetId: target.id, url: `/${prefix}/blog/${slug}/` }]
+    const passage = byPath.get(String(link.sourceNodePath))
+    if (!target?.slug || !passage || typeof link.anchor !== 'string' || !passage.content.includes(link.anchor)) return []
+    return [{
+      ...link, sourcePostId: Number(post.id), sourceNodePath: passage.nodePath,
+      sourceContentHash: passage.contentHash, targetId: target.id, targetPostId: target.id,
+      url: `/${prefix}/blog/${target.slug}/`, relevanceScore: Number(target.score || 0),
+    }]
   }).slice(0, 6)
+  await recordLinkSuggestions(payload, links, locale)
+  return links
 }
 
 async function generateInboundLinkPlan(payload: any, target: any, locale: ContentLocale) {
-  const tagIds = (target.tags || []).map((tag: any) => typeof tag === 'object' ? tag.value?.id || tag.id || tag.value : tag)
-  if (!tagIds.length) return []
-  const tagSet = new Set(tagIds.map(String))
-  const result = await payload.find({
-    collection: 'posts-new', locale, fallbackLocale: false, depth: 0, limit: 200,
-    where: { and: [{ id: { not_equals: target.id } }, { publicationStatus: { equals: 'published' } }] },
-  })
-  const candidateDocs = result.docs.filter((doc: any) => (doc.tags || []).some((tag: any) => {
-    const id = typeof tag === 'object' ? tag.value?.id || tag.id || tag.value : tag
-    return id != null && tagSet.has(String(id))
-  })).slice(0, 18)
   const prefix = locale === 'uk' ? 'ua' : locale
   const targetSlug = target.publicSlug || target.slug
   if (!targetSlug) return []
   const targetURL = `/${prefix}/blog/${targetSlug}/`
-  const sources = candidateDocs.flatMap((doc: any) => {
-    const text = lexicalPlainText(doc.content)
-    if (!text || JSON.stringify(doc.content).includes(targetURL)) return []
-    return [{ id: doc.id, title: doc.name, summary: doc.summary, article: text.slice(0, 7_000) }]
-  })
+  const sources = await retrieveRelatedPassages(payload, target, locale, 12)
   if (!sources.length) return []
   const response = await openRouterJSON(
-    `Select 2-5 published sailing articles that should link to the new target article. For every source choose one exact natural anchor phrase already present verbatim in that source article. The link must add genuine topical value and be distributed across the cluster. Return JSON {"links":[{"sourcePostId":1,"anchor":"exact phrase","reason":"..."}]}.`,
-    JSON.stringify({ target: { title: target.name, summary: target.summary, url: targetURL }, sources }), editorialModel(),
+    `Select 2-5 published sailing passages that should link to the new target article. For every source choose one exact natural 2-7 word anchor phrase already present verbatim in that single passage. Do not rewrite the paragraph, invent an anchor or select a passage that already has a link. Prefer different source pages and genuine reader value over SEO repetition. Return JSON {"links":[{"sourcePostId":1,"sourceNodePath":"0.2","anchor":"exact phrase","reason":"reader benefit"}]}.`,
+    JSON.stringify({
+      target: { title: target.name, summary: target.summary, url: targetURL },
+      sources: sources.map((source) => ({ postId: source.postId, title: source.title, nodePath: source.nodePath, heading: source.heading, passage: source.content.slice(0, 1_200), score: Number(source.hybridScore.toFixed(4)) })),
+    }), editorialModel(), 1_600,
   )
-  const byId = new Map(candidateDocs.map((doc: any) => [String(doc.id), doc]))
-  return (Array.isArray(response.links) ? response.links : []).flatMap((link: any) => {
-    const source: any = byId.get(String(link.sourcePostId))
-    if (!source || typeof link.anchor !== 'string' || !lexicalPlainText(source.content).includes(link.anchor)) return []
-    return [{ ...link, sourcePostId: source.id, sourceTitle: source.name, url: targetURL }]
+  const byKey = new Map(sources.map((source) => [`${source.postId}:${source.nodePath}`, source]))
+  const links = (Array.isArray(response.links) ? response.links : []).flatMap((link: any) => {
+    const source = byKey.get(`${link.sourcePostId}:${link.sourceNodePath}`)
+    if (!source || typeof link.anchor !== 'string' || !source.content.includes(link.anchor)) return []
+    return [{
+      ...link, sourcePostId: source.postId, sourceTitle: source.title,
+      sourceNodePath: source.nodePath, sourceContentHash: source.contentHash,
+      targetPostId: Number(target.id), url: targetURL, relevanceScore: source.hybridScore,
+    }]
   }).slice(0, 5)
+  await recordLinkSuggestions(payload, links, locale)
+  return links
 }
 
 function relationId(value: any): string | number | undefined {
@@ -325,15 +330,20 @@ async function applyInboundLinks(payload: any, plan: any[], locale: ContentLocal
   for (const link of plan) {
     const source = await payload.findByID({ collection: 'posts-new', id: link.sourcePostId, locale, fallbackLocale: false, depth: 0 })
     if (!source?.content || JSON.stringify(source.content).includes(link.url)) continue
-    const content = applyLinkPlan(source.content, [{ anchor: link.anchor, url: link.url }])
+    const content = link.sourceNodePath && link.sourceContentHash
+      ? applyLinkSuggestion(source.content, link)
+      : applyLinkPlan(source.content, [{ anchor: link.anchor, url: link.url }])
     if (JSON.stringify(content) === JSON.stringify(source.content)) continue
     await payload.update({ collection: 'posts-new', id: source.id, locale, context: { skipLocalizationWorkflow: true }, data: { content } })
+    await syncPostLinkIndex(payload, { ...source, content }, locale)
   }
 }
 
 function applyLinkPlan(content: unknown, links: any[]): unknown {
-  const clone = structuredClone(content) as any
-  const pending = links.filter((link) => link?.url && link?.anchor).map((link) => ({ ...link, applied: false }))
+  let clone = structuredClone(content) as any
+  const targeted = links.filter((link) => link?.sourceNodePath && link?.sourceContentHash && link?.url && link?.anchor)
+  for (const link of targeted) clone = applyLinkSuggestion(clone, link)
+  const pending = links.filter((link) => !link?.sourceNodePath && link?.url && link?.anchor).map((link) => ({ ...link, applied: false }))
   const visit = (node: any, insideLink = false) => {
     if (!node || typeof node !== 'object') return
     if (!Array.isArray(node.children)) return
@@ -445,7 +455,9 @@ function buildJSONLD(post: any, locale: ContentLocale, editorial: any, faqs: any
 export const localizePostTask: TaskConfig<any> = {
   slug: 'localize-post',
   label: 'Localize post, SEO and link plan',
-  retries: 2,
+  // A full editorial workflow is expensive and stageful. Retrying the entire
+  // task after a provider error duplicated translations and link analysis.
+  retries: 0,
   concurrency: { key: ({ input }: any) => `post:${input.postId}`, exclusive: true, supersedes: true },
   inputSchema: [
     { name: 'postId', type: 'number', required: true },
@@ -505,6 +517,10 @@ export const localizePostTask: TaskConfig<any> = {
       const refreshed = await req.payload.findByID({ collection: 'posts-new', id: source.id, locale: sourceLocale, fallbackLocale: false, depth: 1 }) as any
       source.tags = refreshed.tags
     }
+    if (runTaxonomyLinks) {
+      await reportStage(`Indexing ${sourceLocale.toUpperCase()} article passages`)
+      await syncPostLinkIndex(req.payload, source, sourceLocale)
+    }
     if (runImage && source.localizationWorkflow?.imagePrompt && (!source.image || source.localizationWorkflow?.regenerateImage)) {
       await reportStage('Generating the hero image')
       const image = await generateHeroImage(req.payload, source.localizationWorkflow.imagePrompt, source.name)
@@ -560,6 +576,7 @@ export const localizePostTask: TaskConfig<any> = {
         localizationWorkflow: { ...(source.localizationWorkflow || {}), linkPlan: sourceLinkPlan, inboundLinkPlan: sourceInboundLinkPlan },
       },
     })
+    if (runTaxonomyLinks) await syncPostLinkIndex(req.payload, { ...source, content: sourceContent }, sourceLocale)
     if (generatedSourceKeywords) {
       await saveGeneratedKeywords(req.payload, source.id, sourceLocale, sourceEditorial.focusKeyphrase, generatedSourceKeywords)
     }
@@ -582,6 +599,10 @@ export const localizePostTask: TaskConfig<any> = {
       const editorial = await generateEditorialFields({ content: translatedContent, locale: target, name: translatedTitle.title || source.name, glossary })
       const localizedName = translatedTitle.title || editorial.title
       const localized = { ...source, id: source.id, content: translatedContent, name: localizedName, slug: current.slug || generateSlug(localizedName) }
+      if (runTaxonomyLinks) {
+        currentStage = `${target}: indexing translated article passages`
+        await syncPostLinkIndex(req.payload, localized, target)
+      }
       const linkPlan = runTaxonomyLinks ? await generateLinkPlan(req.payload, localized, target) : (current.localizationWorkflow?.linkPlan || [])
       const inboundLinkPlan = runTaxonomyLinks ? await generateInboundLinkPlan(req.payload, localized, target) : (current.localizationWorkflow?.inboundLinkPlan || [])
       if (runTaxonomyLinks && source.publicationStatus === 'published') await applyInboundLinks(req.payload, inboundLinkPlan, target)
@@ -607,6 +628,7 @@ export const localizePostTask: TaskConfig<any> = {
           localizationWorkflow: { ...(source.localizationWorkflow || {}), linkPlan, inboundLinkPlan },
         },
       })
+      if (runTaxonomyLinks) await syncPostLinkIndex(req.payload, { ...localized, content: linkedContent }, target)
       currentStage = `${target}: saving link keywords`
       await saveGeneratedKeywords(req.payload, source.id, target, editorial.focusKeyphrase, generatedKeywords)
       completed.push(target)

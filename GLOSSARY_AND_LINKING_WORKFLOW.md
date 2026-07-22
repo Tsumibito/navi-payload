@@ -21,6 +21,16 @@ Anchors must occur verbatim in the source article. Duplicate URLs and unpublishe
 
 AI never publishes an article. New and regenerated content stops at editorial review, and glossary suggestions stop at `proposed`.
 
+### Passage RAG and the existing-link graph
+
+The linking workflow indexes localized Lexical blocks rather than sending whole articles to an LLM. `link_passages` stores the exact Lexical path, a content hash, heading, tags, links already present in the block and a 1024-dimensional multilingual BGE-M3 embedding. Only changed blocks are embedded again.
+
+`internal_links` is the relational map of the site graph. Existing links are reconstructed from the article content on every index update; proposed, applied and rejected edges are also retained. Retrieval uses that graph to exclude already-linked page pairs and rejected placements, avoid blocks that already contain a link, cap links from overloaded source pages and favour page diversity.
+
+For a new page, hybrid retrieval combines vector similarity, tag overlap and lexical overlap. At most 8–12 exact passages reach the editorial model. The model may only choose an anchor already present verbatim in one supplied passage. Applying a suggestion requires both the Lexical node path and its original content hash to match, so an editor's later change prevents a stale automated insertion.
+
+Embeddings use Cloudflare Workers AI and `@cf/baai/bge-m3`. Runtime configuration requires `CLOUDFLARE_AI_API_TOKEN`; the account ID is read from `CLOUDFLARE_ACCOUNT_ID` or inferred from the R2 endpoint. The authenticated `/api/internal-link-index` endpoint backfills published posts in bounded batches and reports graph/index totals.
+
 ## Encyclopedia MVP
 
 The first public release is deliberately limited to 100–150 editorially selected concepts. The existing imported corpus remains in `backlog`; candidates move through `mvp` and only an approved concept in the `published` release is exposed to the Astro SSG build. One concept can have any number of BCP-47 language rows, and each language row owns its route slug, short definition, encyclopedia text, SEO copy and image alt text.

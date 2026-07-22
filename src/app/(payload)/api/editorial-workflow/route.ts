@@ -86,6 +86,7 @@ export async function POST(request: Request) {
       if (errors.length) return NextResponse.json({ error: 'Статья не готова к публикации', errors }, { status: 409 })
       await payload.update({ collection: 'posts-new', id: postId, locale: sourceLocale, context: { skipLocalizationWorkflow: true }, data: { publicationStatus: 'published' } })
       await payload.jobs.queue({ task: 'localize-post' as never, queue: 'content-localization', input: { postId: Number(postId), sourceLocale, targetLocales: ['uk', 'ru', 'en'], changedFields: ['publicationStatus'], stages: ['taxonomy-links'] } as never })
+      void payload.jobs.run({ queue: 'content-localization', limit: 1 }).catch((error) => payload.logger.error({ err: error }, 'Publication link worker failed'))
       return NextResponse.json({ published: true, postId })
     }
     const workflow = {
