@@ -1,13 +1,12 @@
 'use client'
 
-import { useDocumentInfo, useForm } from '@payloadcms/ui'
+import { useDocumentInfo } from '@payloadcms/ui'
 import React, { useState } from 'react'
 
 type Action = 'seo' | 'faq' | 'alt'
 
 function EditorialFieldAction({ action, label, description }: { action: Action; label: string; description: string }) {
   const info = useDocumentInfo()
-  const { submit } = useForm()
   const [state, setState] = useState<'idle' | 'running' | 'error'>('idle')
   const [message, setMessage] = useState('')
   const locale = (() => {
@@ -19,13 +18,14 @@ function EditorialFieldAction({ action, label, description }: { action: Action; 
 
   const run = async () => {
     if (!info.id || state === 'running') return
-    setState('running'); setMessage('Сохраняю и генерирую…')
+    setState('running'); setMessage('Генерирую…')
     try {
-      const saved = await submit()
-      if (saved && !saved.res.ok) throw new Error('Не удалось сохранить запись')
       const response = await fetch('/api/editorial-workflow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postId: info.id, action, locale }) })
       const body = await response.json()
-      if (!response.ok) throw new Error(body.error || 'Генерация не выполнена')
+      if (!response.ok) {
+        const details = Array.isArray(body.errors) ? `: ${body.errors.join('; ')}` : ''
+        throw new Error(`${body.error || 'Генерация не выполнена'}${details}`)
+      }
       setMessage('Готово. Обновляю поля…')
       window.location.reload()
     } catch (error) {

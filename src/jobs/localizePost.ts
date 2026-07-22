@@ -143,6 +143,24 @@ function lexicalParagraph(text: string): unknown {
   }
 }
 
+function hasRichText(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false
+  const root = (value as any).root
+  if (!root || !Array.isArray(root.children)) return false
+  const stack = [...root.children]
+  while (stack.length) {
+    const node = stack.pop()
+    if (typeof node?.text === 'string' && node.text.trim()) return true
+    if (Array.isArray(node?.children)) stack.push(...node.children)
+  }
+  return false
+}
+
+function validFAQs(value: unknown): any[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((faq) => typeof faq?.question === 'string' && faq.question.trim() && hasRichText(faq.answer))
+}
+
 async function generateFAQs(content: unknown, locale: ContentLocale, glossary = ''): Promise<any[]> {
   const article = lexicalPlainText(content).slice(0, 30_000)
   const response = await openRouterJSON(
@@ -232,7 +250,7 @@ function assertLocalizedResult(args: { locale: ContentLocale; post: any; editori
   if (!args.post.name?.trim() || text.split(/\s+/).length < 150) throw new Error(`${args.locale}: localized article is incomplete`)
   if (!args.editorial?.seoTitle || !args.editorial?.metaDescription || !args.editorial?.focusKeyphrase || !args.editorial?.imageAlt) throw new Error(`${args.locale}: editorial fields are incomplete`)
   if (String(args.editorial.seoTitle).length > 65 || String(args.editorial.metaDescription).length < 100 || String(args.editorial.metaDescription).length > 175) throw new Error(`${args.locale}: invalid SEO lengths`)
-  if (args.faqs.length < 4) throw new Error(`${args.locale}: fewer than four FAQs`)
+  if (validFAQs(args.faqs).length < 4) throw new Error(`${args.locale}: fewer than four valid FAQs`)
   if (args.linkPlan.length > 6) throw new Error(`${args.locale}: too many outgoing links`)
 }
 
@@ -418,9 +436,10 @@ export const localizePostTask: TaskConfig<any> = {
     const sourceEditorial = runSourceEditorial && fieldScope !== 'faq'
       ? await generateEditorialFields({ content: source.content, locale: sourceLocale, name: source.name, summary: source.summary, glossary: sourceGlossary })
       : { summary: source.summary, seoTitle: source.seo?.title, metaDescription: source.seo?.meta_description, focusKeyphrase: source.seo?.focus_keyphrase, imageAlt: source.imageAlt }
-    const sourceFAQs = (runSourceEditorial && (fieldScope === 'all' || fieldScope === 'faq')) || (runTranslations && !(source.faqs || []).length)
+    const existingSourceFAQs = validFAQs(source.faqs)
+    const sourceFAQs = (runSourceEditorial && (fieldScope === 'all' || fieldScope === 'faq')) || (runTranslations && !existingSourceFAQs.length)
       ? await generateFAQs(source.content, sourceLocale, sourceGlossary)
-      : (source.faqs || [])
+      : existingSourceFAQs
     const sourceLinkPlan = runTaxonomyLinks ? await generateLinkPlan(req.payload, source, sourceLocale) : (source.localizationWorkflow?.linkPlan || [])
     const sourceInboundLinkPlan = runTaxonomyLinks ? await generateInboundLinkPlan(req.payload, source, sourceLocale) : (source.localizationWorkflow?.inboundLinkPlan || [])
     if (runTaxonomyLinks && source.publicationStatus === 'published') await applyInboundLinks(req.payload, sourceInboundLinkPlan, sourceLocale)
@@ -434,7 +453,13 @@ export const localizePostTask: TaskConfig<any> = {
         ...(runSourceEditorial && (fieldScope === 'all' || fieldScope === 'faq') ? { faqs: sourceFAQs } : {}),
         ...(runSourceEditorial && (fieldScope === 'all' || fieldScope === 'alt') ? { imageAlt: sourceEditorial.imageAlt } : {}),
         content: sourceContent,
-        ...((runTaxonomyLinks || (runSourceEditorial && ['all', 'seo', 'faq'].includes(fieldScope))) ? { seo: { ...(source.seo || {}), title: sourceEditorial.seoTitle, meta_description: sourceEditorial.metaDescription, focus_keyphrase: sourceEditorial.focusKeyphrase, link_keywords: sourceLinkPlan.map((link: any) => `${link.anchor} -> ${link.url}`).join('\n'), json_ld: sourceJSONLD } } : {}),
+        ...((runTaxonomyLinks || (runSourceEditorial && ['all', 'seo', 'faq'].includes(fieldScope))) ? { seo: {
+          ...(source.seo || {}),
+          // FAQ-only generation refreshes FAQPage JSON-LD without erasing existing SEO fields.
+          ...(fieldScope !== 'faq' ? { title: sourceEditorial.seoTitle, meta_description: sourceEditorial.metaDescription, focus_keyphrase: sourceEditorial.focusKeyphrase } : {}),
+          ...(runTaxonomyLinks ? { link_keywords: sourceLinkPlan.map((link: any) => `${link.anchor} -> ${link.url}`).join('\n') } : {}),
+          json_ld: sourceJSONLD,
+        } } : {}),
         localizationWorkflow: { ...(source.localizationWorkflow || {}), linkPlan: sourceLinkPlan, inboundLinkPlan: sourceInboundLinkPlan },
       },
     })
@@ -456,7 +481,8 @@ export const localizePostTask: TaskConfig<any> = {
       const inboundLinkPlan = await generateInboundLinkPlan(req.payload, localized, target)
       if (source.publicationStatus === 'published') await applyInboundLinks(req.payload, inboundLinkPlan, target)
       const linkedContent = applyLinkPlan(translatedContent, linkPlan)
-      const localizedFAQs = changed.has('faqs') || !current.faqs?.length ? await translateFAQs(sourceFAQs, sourceLocale, target, glossary) : current.faqs
+      const existingLocalizedFAQs = validFAQs(current.faqs)
+      const localizedFAQs = changed.has('faqs') || !existingLocalizedFAQs.length ? await translateFAQs(sourceFAQs, sourceLocale, target, glossary) : existingLocalizedFAQs
       assertLocalizedResult({ locale: target, post: { ...localized, content: linkedContent }, editorial, faqs: localizedFAQs, linkPlan })
       const jsonLD = buildJSONLD({ ...localized, content: linkedContent, slug: generateSlug(localized.name) }, target, editorial, localizedFAQs)
       await req.payload.update({
