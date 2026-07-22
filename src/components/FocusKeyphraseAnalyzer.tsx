@@ -96,6 +96,7 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
   const [showInternalDetails, setShowInternalDetails] = useState(false);
   const [showPotentialDetails, setShowPotentialDetails] = useState(false);
   const [effectiveContext, setEffectiveContext] = useState<SeoContentContext | null>(null);
+  const [statsHydrated, setStatsHydrated] = useState(false);
   const statsRef = useRef<FocusKeyphraseStats>(EMPTY_STATS);
   const lastEnhancedSignatureRef = useRef<string | null>(null);
   const faqCacheRef = useRef<Record<string, unknown[]>>({});
@@ -232,7 +233,6 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
 
     const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
     if (uniqueIds.length === 0) {
-      console.log('[FocusKeyphraseAnalyzer] resolveFaqDetails: inline entries', detailed.length);
       if (detailed.length > 0) {
         faqCacheRef.current[locale] = detailed;
         return detailed;
@@ -251,7 +251,6 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
             if (!data) {
               return null;
             }
-            console.log('[FocusKeyphraseAnalyzer] resolveFaqDetails fetched', id, data);
             return {
               question: typeof data.question === 'string' ? data.question : '',
               answer: data.answer ?? null,
@@ -272,7 +271,6 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
       console.error('[FocusKeyphraseAnalyzer] FAQ batch fetch failed:', error);
     }
 
-    console.log('[FocusKeyphraseAnalyzer] resolveFaqDetails result length', detailed.length);
     if (detailed.length > 0) {
       faqCacheRef.current[locale] = detailed;
       return detailed;
@@ -293,7 +291,6 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
                 })
                 .filter(Boolean)
             : [];
-          console.log('[FocusKeyphraseAnalyzer] resolveFaqDetails post fallback', fromPost.length);
           if (fromPost.length > 0) {
             faqCacheRef.current[locale] = fromPost as unknown[];
             return fromPost as unknown[];
@@ -356,17 +353,12 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
     };
   }, [baseContext, contextSignature, currentLocale, resolveFaqDetails, applyEffectiveContext, stableContextParams, effectiveContext]);
 
-  // Загружаем stats из БД (только один раз при монтировании)
+  // Load the locale-specific persisted analysis before calculating fresh values.
   useEffect(() => {
+    let active = true;
     const loadStats = async () => {
-      // Сначала пробуем загрузить из поля формы
-      if (statsField && typeof statsField === 'object') {
-        setStats({ ...EMPTY_STATS, ...statsField });
-        console.log('[FocusKeyphraseAnalyzer] Loaded from form field:', statsField);
-        return;
-      }
-
-      // Если нет в поле формы, загружаем из БД
+      setStatsHydrated(false);
+      let loaded: FocusKeyphraseStats | null = null;
       if (docInfo?.id && docInfo?.collectionSlug && currentLocale) {
         try {
           const response = await fetch(
@@ -376,21 +368,27 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
           if (response.ok) {
             const data = await response.json();
             if (data && data.stats) {
-              setStats({ ...EMPTY_STATS, ...data.stats });
-              console.log('[FocusKeyphraseAnalyzer] Loaded from database for locale:', currentLocale, data.stats);
-            } else {
-              console.log('[FocusKeyphraseAnalyzer] No data for locale:', currentLocale);
+              loaded = { ...EMPTY_STATS, ...data.stats };
             }
           }
         } catch (error) {
           console.error('[FocusKeyphraseAnalyzer] Load error:', error);
         }
       }
+      if (!loaded && statsField && typeof statsField === 'object') loaded = { ...EMPTY_STATS, ...statsField };
+      if (!active) return;
+      const next = loaded || EMPTY_STATS;
+      setStats(next);
+      statsRef.current = next;
+      lastAutoCalcSignatureRef.current = null;
+      setStatsHydrated(true);
     };
 
-    loadStats();
+    void loadStats();
+    return () => { active = false; };
+  // statsField is only a fallback snapshot; reacting to our own dispatch would create a reload loop.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentLocale, docInfo?.collectionSlug, docInfo?.id]);
 
   // Пересчет метрик (возвращает новые stats)
   const handleRecalculate = useCallback(async (currentStats: FocusKeyphraseStats): Promise<FocusKeyphraseStats> => {
@@ -430,9 +428,6 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
       },
     });
 
-    console.log('[FocusKeyphraseAnalyzer] FAQ text sample:', (contextForCalc.faqText ?? '').slice(0, 200));
-    console.log('[FocusKeyphraseAnalyzer] FAQ occurrences:', baseStats.inFaq);
-
     const { anchorLinksCount, ...rest } = baseStats;
     void anchorLinksCount;
 
@@ -449,6 +444,7 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
   const lastAutoCalcSignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!statsHydrated) return;
     if (!focusKeyphrase) {
       lastAutoCalcSignatureRef.current = null;
       return;
@@ -498,7 +494,7 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
         console.error('[FocusKeyphraseAnalyzer] Auto recalculation failed:', error);
       }
     })();
-  }, [focusKeyphrase, baseContext, effectiveContext, handleRecalculate, dispatch, path]);
+  }, [focusKeyphrase, baseContext, effectiveContext, handleRecalculate, dispatch, path, statsHydrated]);
 
   // Полный пересчет: метрики + ссылки
   const handleFullRecalculate = useCallback(async () => {
@@ -579,8 +575,7 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
           });
           
           if (saveResponse.ok) {
-            const savedData = await saveResponse.json();
-            console.log('[FocusKeyphraseAnalyzer] Saved to database for locale:', currentLocale, savedData);
+            await saveResponse.json();
           } else {
             const errorText = await saveResponse.text();
             console.error('[FocusKeyphraseAnalyzer] Save failed:', errorText);
@@ -590,7 +585,6 @@ export const FocusKeyphraseAnalyzer: UIFieldClientComponent = ({ path }) => {
         }
       }
       
-      console.log('[FocusKeyphraseAnalyzer] Updated stats:', updatedStats);
     } catch (error) {
       console.error('[FocusKeyphraseAnalyzer] Error:', error);
     } finally {

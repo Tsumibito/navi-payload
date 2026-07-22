@@ -1,6 +1,8 @@
 import type { TaskConfig } from 'payload'
+import { sql } from '@payloadcms/db-postgres/drizzle'
 
 import { CONTENT_LOCALES, type ContentLocale, YACHTING_GLOSSARY } from '../config/contentLocales'
+import { buildSeoContentContext, enrichKeywordEntries, serializeKeywords, type AdditionalFieldsValue } from '../utils/seoAnalysis'
 import { generateSlug } from '../utils/slug'
 
 type LexicalNode = { type?: string; text?: string; children?: LexicalNode[]; [key: string]: unknown }
@@ -82,8 +84,22 @@ function collectTextNodes(value: unknown, result: Array<{ id: string; node: Lexi
   return result
 }
 
+export function normalizeLexicalRelations(content: unknown): unknown {
+  const clone = structuredClone(content) as any
+  const visit = (value: any) => {
+    if (!value || typeof value !== 'object') return
+    if ((value.type === 'upload' || value.type === 'relationship') && value.value && typeof value.value === 'object') {
+      const id = relationId(value.value)
+      if (id !== undefined) value.value = id
+    }
+    Object.values(value).forEach(visit)
+  }
+  visit(clone)
+  return clone
+}
+
 async function translateLexical(content: unknown, source: ContentLocale, target: ContentLocale, glossary = ''): Promise<unknown> {
-  const clone = structuredClone(content)
+  const clone = normalizeLexicalRelations(content)
   const nodes = collectTextNodes(clone)
   for (let offset = 0; offset < nodes.length; offset += 35) {
     const batch = nodes.slice(offset, offset + 35)
@@ -126,9 +142,50 @@ async function generateEditorialFields(args: { content: unknown; locale: Content
   const plainText = collectTextNodes(structuredClone(args.content)).map(({ node }) => node.text).join(' ').slice(0, 24_000)
   return openRouterJSON(
     `You are the senior multilingual editor of Navi.training, a professional sailing school. Write exclusively in ${args.locale}; never mix languages. ${YACHTING_GLOSSARY}\n${args.glossary || ''}
-Return JSON with title, summary, seoTitle, metaDescription, focusKeyphrase, imageAlt. The summary is two concrete sentences (220-320 characters) explaining what the reader will learn. SEO title is 45-60 characters and preserves the real search intent. Meta description is 135-160 characters with a natural benefit, not a keyword list. focusKeyphrase is one realistic query. imageAlt describes only the likely article subject, without “image of”. Do not invent prices, laws, qualifications or equipment capabilities. Avoid clickbait, generic praise and repeated phrases.`,
+Return JSON with title, summary, seoTitle, metaDescription, focusKeyphrase, linkKeywords and imageAlt. The summary is two concrete sentences (220-320 characters) explaining what the reader will learn. SEO title is 45-60 characters and preserves the real search intent. Meta description is 135-160 characters with a natural benefit, not a keyword list. focusKeyphrase must be one natural 2-6 word search phrase that already occurs verbatim in the supplied article title and at least once in the article body; include that exact phrase once in seoTitle, metaDescription and summary. linkKeywords must be an array of 5-8 distinct, useful internal-link anchor phrases (2-6 words each) that occur verbatim in the article body; exclude focusKeyphrase and generic words. imageAlt describes only the likely article subject, without “image of”. Do not invent prices, laws, qualifications or equipment capabilities. Avoid clickbait, generic praise and repeated phrases.`,
     JSON.stringify({ title: args.name, currentSummary: args.summary, article: plainText }),
   )
+}
+
+function buildGeneratedKeywords(editorial: any, content: unknown, faqs: any[]): AdditionalFieldsValue {
+  const focus = String(editorial?.focusKeyphrase || '').trim().toLocaleLowerCase()
+  const seen = new Set<string>()
+  const article = lexicalPlainText(content).toLocaleLowerCase()
+  const keywords = (Array.isArray(editorial?.linkKeywords) ? editorial.linkKeywords : [])
+    .flatMap((value: unknown) => typeof value === 'string' ? [value.trim()] : [])
+    .filter((keyword: string) => {
+      const normalized = keyword.toLocaleLowerCase()
+      if (!normalized || normalized === focus || seen.has(normalized) || !article.includes(normalized)) return false
+      const words = keyword.split(/\s+/).filter(Boolean)
+      if (words.length < 2 || words.length > 6) return false
+      seen.add(normalized)
+      return true
+    })
+    .slice(0, 8)
+    .map((keyword: string) => ({ keyword, notes: '', linksCount: 0, potentialLinksCount: 0, cachedTotal: 0, cachedHeadings: 0 }))
+  return enrichKeywordEntries({
+    keywords,
+    context: buildSeoContentContext({ content, faqs }),
+  }).value
+}
+
+async function saveGeneratedKeywords(payload: any, postId: string | number, locale: ContentLocale, focusKeyphrase: string, value: AdditionalFieldsValue) {
+  const json = JSON.stringify(value)
+  const calculatedAt = new Date().toISOString()
+  const updated = await payload.db.drizzle.execute(sql`
+    UPDATE navi."seo-stats"
+    SET focus_keyphrase = ${focusKeyphrase}, link_keywords = ${json}::jsonb,
+        calculated_at = ${calculatedAt}::timestamp, updated_at = NOW()
+    WHERE entity_type = 'posts-new' AND entity_id = ${String(postId)} AND locale = ${locale}
+    RETURNING id
+  `)
+  if (updated.rows?.length) return
+  await payload.db.drizzle.execute(sql`
+    INSERT INTO navi."seo-stats"
+      (entity_type, entity_id, locale, focus_keyphrase, link_keywords, calculated_at, created_at, updated_at)
+    VALUES
+      ('posts-new', ${String(postId)}, ${locale}, ${focusKeyphrase}, ${json}::jsonb, ${calculatedAt}::timestamp, NOW(), NOW())
+  `)
 }
 
 function lexicalParagraph(text: string): unknown {
@@ -394,11 +451,12 @@ export const localizePostTask: TaskConfig<any> = {
   handler: async ({ input, req }: any) => {
     const sourceLocale = input.sourceLocale as ContentLocale
     try {
-    const source = await req.payload.findByID({ collection: 'posts-new', id: input.postId, locale: sourceLocale, fallbackLocale: false, depth: 1 }) as any
+    const source = await req.payload.findByID({ collection: 'posts-new', id: input.postId, locale: sourceLocale, fallbackLocale: false, depth: 0 }) as any
     if (!source.name || !source.content) throw new Error(`Source locale ${sourceLocale} has no title or content`)
+    source.content = normalizeLexicalRelations(source.content)
     await req.payload.update({
       collection: 'posts-new', id: input.postId, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
-      data: { localizationWorkflow: { ...(source.localizationWorkflow || {}), state: 'running', lastError: null } },
+      data: { content: source.content, localizationWorkflow: { ...(source.localizationWorkflow || {}), state: 'running', lastError: null } },
     })
     const targets = [...new Set((input.targetLocales || []).filter((locale: string) => locale !== sourceLocale))] as ContentLocale[]
     const changed = new Set(input.changedFields || ['name', 'content', 'summary', 'image'])
@@ -446,23 +504,36 @@ export const localizePostTask: TaskConfig<any> = {
     const sourceContent = runTaxonomyLinks ? applyLinkPlan(source.content, sourceLinkPlan) : source.content
     if (runSourceEditorial && fieldScope === 'all') assertLocalizedResult({ locale: sourceLocale, post: { ...source, content: sourceContent }, editorial: sourceEditorial, faqs: sourceFAQs, linkPlan: sourceLinkPlan })
     const sourceJSONLD = buildJSONLD({ ...source, content: sourceContent }, sourceLocale, sourceEditorial, sourceFAQs)
+    const generatedSourceKeywords = runSourceEditorial && fieldScope !== 'faq'
+      ? buildGeneratedKeywords(sourceEditorial, sourceContent, sourceFAQs)
+      : null
+    if (generatedSourceKeywords && generatedSourceKeywords.keywords.length < 4) {
+      throw new Error(`${sourceLocale}: fewer than four valid link keywords generated`)
+    }
     await req.payload.update({
       collection: 'posts-new', id: source.id, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
       data: {
         ...(runSourceEditorial && fieldScope === 'all' ? { summary: sourceEditorial.summary || source.summary } : {}),
         ...(runSourceEditorial && (fieldScope === 'all' || fieldScope === 'faq') ? { faqs: sourceFAQs } : {}),
         ...(runSourceEditorial && (fieldScope === 'all' || fieldScope === 'alt') ? { imageAlt: sourceEditorial.imageAlt } : {}),
-        content: sourceContent,
+        ...(runTaxonomyLinks ? { content: normalizeLexicalRelations(sourceContent) } : {}),
         ...((runTaxonomyLinks || (runSourceEditorial && ['all', 'seo', 'faq'].includes(fieldScope))) ? { seo: {
           ...(source.seo || {}),
           // FAQ-only generation refreshes FAQPage JSON-LD without erasing existing SEO fields.
-          ...(fieldScope !== 'faq' ? { title: sourceEditorial.seoTitle, meta_description: sourceEditorial.metaDescription, focus_keyphrase: sourceEditorial.focusKeyphrase } : {}),
-          ...(runTaxonomyLinks ? { link_keywords: sourceLinkPlan.map((link: any) => `${link.anchor} -> ${link.url}`).join('\n') } : {}),
+          ...(fieldScope !== 'faq' ? {
+            title: sourceEditorial.seoTitle,
+            meta_description: sourceEditorial.metaDescription,
+            focus_keyphrase: sourceEditorial.focusKeyphrase,
+            ...(generatedSourceKeywords ? { link_keywords: serializeKeywords(generatedSourceKeywords.keywords) } : {}),
+          } : {}),
           json_ld: sourceJSONLD,
         } } : {}),
         localizationWorkflow: { ...(source.localizationWorkflow || {}), linkPlan: sourceLinkPlan, inboundLinkPlan: sourceInboundLinkPlan },
       },
     })
+    if (generatedSourceKeywords) {
+      await saveGeneratedKeywords(req.payload, source.id, sourceLocale, sourceEditorial.focusKeyphrase, generatedSourceKeywords)
+    }
     completed.push(sourceLocale)
 
     if (runTranslations) for (const target of targets) {
@@ -485,19 +556,22 @@ export const localizePostTask: TaskConfig<any> = {
       const localizedFAQs = changed.has('faqs') || !existingLocalizedFAQs.length ? await translateFAQs(sourceFAQs, sourceLocale, target, glossary) : existingLocalizedFAQs
       assertLocalizedResult({ locale: target, post: { ...localized, content: linkedContent }, editorial, faqs: localizedFAQs, linkPlan })
       const jsonLD = buildJSONLD({ ...localized, content: linkedContent, slug: generateSlug(localized.name) }, target, editorial, localizedFAQs)
+      const generatedKeywords = buildGeneratedKeywords(editorial, linkedContent, localizedFAQs)
+      if (generatedKeywords.keywords.length < 4) throw new Error(`${target}: fewer than four valid link keywords generated`)
       await req.payload.update({
         collection: 'posts-new', id: source.id, locale: target, context: { skipLocalizationWorkflow: true },
         data: {
           name: localized.name,
           slug: generateSlug(localized.name),
           summary: changed.has('summary') || changed.has('content') || !current.summary ? editorial.summary : current.summary,
-          content: linkedContent,
+          content: normalizeLexicalRelations(linkedContent),
           faqs: localizedFAQs,
           imageAlt: editorial.imageAlt,
-          seo: { title: editorial.seoTitle, meta_description: editorial.metaDescription, focus_keyphrase: editorial.focusKeyphrase, link_keywords: linkPlan.map((link: any) => `${link.anchor} -> ${link.url}`).join('\n'), json_ld: jsonLD },
+          seo: { title: editorial.seoTitle, meta_description: editorial.metaDescription, focus_keyphrase: editorial.focusKeyphrase, link_keywords: serializeKeywords(generatedKeywords.keywords), json_ld: jsonLD },
           localizationWorkflow: { ...(source.localizationWorkflow || {}), linkPlan, inboundLinkPlan },
         },
       })
+      await saveGeneratedKeywords(req.payload, source.id, target, editorial.focusKeyphrase, generatedKeywords)
       completed.push(target)
     }
 

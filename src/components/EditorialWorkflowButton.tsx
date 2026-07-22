@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, useDocumentInfo, useForm } from '@payloadcms/ui'
+import { Button, useDocumentInfo } from '@payloadcms/ui'
 import React, { useCallback, useEffect, useState } from 'react'
 
 type Action = 'editorial' | 'translations' | 'taxonomy' | 'image' | 'full' | 'publish'
@@ -15,7 +15,6 @@ const actions: Array<{ action: Action; eyebrow: string; title: string; text: str
 export function EditorialWorkflowButton() {
   const documentInfo = useDocumentInfo()
   const { id } = documentInfo
-  const { submit } = useForm()
   const [active, setActive] = useState<Action | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -42,10 +41,8 @@ export function EditorialWorkflowButton() {
   const run = async (action: Action) => {
     if (!id || active) return
     if (action === 'publish' && !window.confirm('Опубликовать статью и открыть её для SSG?')) return
-    setActive(action); setError(''); setMessage('Сохраняю текущие изменения…')
+    setActive(action); setError(''); setMessage('Запускаю действие для последней сохранённой версии…')
     try {
-      const saved = await submit()
-      if (saved && !saved.res.ok) throw new Error('Не удалось сохранить запись')
       setMessage(action === 'publish' ? 'Проверяю готовность…' : 'Ставлю задачу в очередь…')
       const response = await fetch('/api/editorial-workflow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postId: id, action, locale: currentLocale }) })
       const body = await response.json()
@@ -65,7 +62,7 @@ export function EditorialWorkflowButton() {
     <section style={{ margin: '0 0 24px', border: '1px solid var(--theme-elevation-150)', borderRadius: 12, overflow: 'hidden', background: 'var(--theme-elevation-0)' }}>
       <header style={{ padding: '20px 22px', background: 'linear-gradient(120deg, #082f49, #075985 68%, #0e7490)', color: '#fff' }}>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <div><div style={{ fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', opacity: .7 }}>Navi editorial bridge</div><h3 style={{ margin: '5px 0 4px', fontSize: 24 }}>Publication control</h3><p style={{ margin: 0, maxWidth: 720, opacity: .82 }}>Work through individual stages, or run the complete preparation. Publishing is always a separate action.</p></div>
+          <div><div style={{ fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', opacity: .7 }}>Navi editorial bridge</div><h3 style={{ margin: '5px 0 4px', fontSize: 24 }}>Publication control</h3><p style={{ margin: 0, maxWidth: 720, opacity: .82 }}>Actions use the last saved article version. Save manual edits first. Publishing is always a separate action.</p></div>
           <div style={{ display: 'flex', gap: 7 }}><span style={{ padding: '6px 10px', borderRadius: 999, background: '#ffffff18' }}>Workflow: {workflowState}</span><span style={{ padding: '6px 10px', borderRadius: 999, background: publication === 'published' ? '#16a34a' : '#f59e0b', color: publication === 'published' ? '#fff' : '#1c1917' }}>{publication}</span></div>
         </div>
       </header>

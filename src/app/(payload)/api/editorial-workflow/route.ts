@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { authenticatePayloadRequest, unauthorizedResponse } from '@/utils/authenticatedPayload'
-import { localizePostTask } from '@/jobs/localizePost'
+import { localizePostTask, normalizeLexicalRelations } from '@/jobs/localizePost'
 
 const DEFAULT_IMAGE_PROMPT = 'Photorealistic editorial hero image for a professional sailing article. Accurate modern yacht equipment and realistic seamanship context, natural light, clean 16:9 composition, no logos, brands, watermarks or readable interface text.'
 type Action = 'editorial' | 'seo' | 'faq' | 'alt' | 'translations' | 'taxonomy' | 'image' | 'full' | 'publish'
@@ -89,6 +89,7 @@ export async function POST(request: Request) {
       data: {
         publicationStatus: action === 'full' ? 'localizing' : 'review',
         localizationWorkflow: workflow,
+        content: normalizeLexicalRelations(source.content) as any,
         // Repair stale empty array rows left by the former FAQ generator. Payload validates
         // required nested fields even when an unrelated SEO field is being updated.
         ...(cleanedFAQs.length !== (source.faqs || []).length ? { faqs: cleanedFAQs } : {}),

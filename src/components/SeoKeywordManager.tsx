@@ -294,9 +294,7 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
           const data = await response.json();
           if (data && data.link_keywords) {
             setLocalValue(data.link_keywords);
-            console.log('[SeoKeywordManager] Loaded from database for locale:', currentLocale, data.link_keywords);
           } else {
-            console.log('[SeoKeywordManager] No data for locale:', currentLocale);
             setLocalValue(EMPTY_VALUE); // Сбрасываем в пустое значение
           }
         }
@@ -330,9 +328,7 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
           }),
         });
 
-        if (response.ok) {
-          console.log('[SeoKeywordManager] Data saved to DB for locale:', currentLocale);
-        } else {
+        if (!response.ok) {
           console.error('[SeoKeywordManager] Failed to save:', await response.text());
         }
       } catch (error) {
@@ -458,7 +454,6 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
       commitToForm(newValue);
       await saveToDatabase(newValue);
       
-      console.log('[SeoKeywordManager] Added and calculated new keyword:', newEntry);
     } catch (error) {
       console.error('[SeoKeywordManager] Add keyword error:', error);
     } finally {
@@ -517,9 +512,6 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
           entry => entry.keyword.toLowerCase().trim() !== normalizedFocusKeyphrase
         );
         
-        if (value.keywords.length < localValue.keywords.length) {
-          console.log('[SeoKeywordManager] Removed Focus Keyphrase from Link Keywords:', focusKeyphrase);
-        }
       }
 
       // Затем подсчитываем ссылки по всей БД
@@ -569,7 +561,6 @@ export const SeoKeywordManager: UIFieldClientComponent = ({ path }) => {
       commitToForm(updatedValue);
       await saveToDatabase(updatedValue);
 
-      console.log('[SeoKeywordManager] Recalculated and saved:', updatedValue);
     } catch (error) {
       console.error('[SeoKeywordManager] Recalculate error:', error);
     } finally {

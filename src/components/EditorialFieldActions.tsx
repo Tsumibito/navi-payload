@@ -39,6 +39,6 @@ function EditorialFieldAction({ action, label, description }: { action: Action; 
   </div>
 }
 
-export const GenerateSeoFieldsButton = () => <EditorialFieldAction action="seo" label="Generate SEO fields" description="SEO title, description, keyphrase and JSON-LD for the open language." />
+export const GenerateSeoFieldsButton = () => <EditorialFieldAction action="seo" label="Generate SEO fields" description="SEO title, description, focus keyphrase, link keywords and JSON-LD for the open language." />
 export const GenerateFaqFieldsButton = () => <EditorialFieldAction action="faq" label="Generate FAQ" description="Create 4–6 useful FAQs in the open language and refresh FAQPage JSON-LD." />
 export const GenerateImageAltButton = () => <EditorialFieldAction action="alt" label="Generate image alt" description="Create a concise localized alt text for the featured image." />
