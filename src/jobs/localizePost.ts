@@ -25,6 +25,10 @@ function editorialModel() {
   return process.env.OPENROUTER_EDITORIAL_MODEL?.trim() || 'z-ai/glm-5.2'
 }
 
+function linkingModel() {
+  return process.env.OPENROUTER_LINKING_MODEL?.trim() || 'deepseek/deepseek-v4-flash'
+}
+
 function imageModel() {
   return process.env.OPENROUTER_IMAGE_MODEL?.trim() || 'google/gemini-3.1-flash-image'
 }
@@ -249,7 +253,7 @@ async function generateLinkPlan(payload: any, post: any, locale: ContentLocale) 
   }])).values()].slice(0, 8)
   const response = await openRouterJSON(
     `You design useful topic-cluster internal links for a sailing school. Select 2-6 links from the source passages to the supplied target pages. Use no more than one link per source passage and one per target. The anchor must be an exact natural phrase already present verbatim in that source passage, 2-7 words, descriptive without keyword stuffing. Do not place a link in a passage that already contains one. Return JSON {"links":[{"targetId":1,"sourceNodePath":"0.2","anchor":"exact text","reason":"reader benefit"}]}.`,
-    JSON.stringify({ sourcePassages: sourcePassages.map((passage) => ({ nodePath: passage.nodePath, heading: passage.heading, text: passage.content.slice(0, 1_200) })), targets }), editorialModel(), 1_600,
+    JSON.stringify({ sourcePassages: sourcePassages.map((passage) => ({ nodePath: passage.nodePath, heading: passage.heading, text: passage.content.slice(0, 1_200) })), targets }), linkingModel(), 1_600,
   )
   const byId = new Map(targets.map((target) => [String(target.id), target]))
   const byPath = new Map(sourcePassages.map((passage) => [passage.nodePath, passage]))
@@ -280,7 +284,7 @@ async function generateInboundLinkPlan(payload: any, target: any, locale: Conten
     JSON.stringify({
       target: { title: target.name, summary: target.summary, url: targetURL },
       sources: sources.map((source) => ({ postId: source.postId, title: source.title, nodePath: source.nodePath, heading: source.heading, passage: source.content.slice(0, 1_200), score: Number(source.hybridScore.toFixed(4)) })),
-    }), editorialModel(), 1_600,
+    }), linkingModel(), 1_600,
   )
   const byKey = new Map(sources.map((source) => [`${source.postId}:${source.nodePath}`, source]))
   const links = (Array.isArray(response.links) ? response.links : []).flatMap((link: any) => {

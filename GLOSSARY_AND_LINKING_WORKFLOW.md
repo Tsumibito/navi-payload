@@ -31,6 +31,8 @@ For a new page, hybrid retrieval combines vector similarity, tag overlap and lex
 
 Embeddings use OpenRouter and `baai/bge-m3` through the existing `OPENROUTER_TOKEN`; `OPENROUTER_EMBEDDING_MODEL` can override the model without changing code. No separate Workers AI credential is required. The authenticated `/api/internal-link-index` endpoint backfills published posts in bounded batches and reports graph/index totals.
 
+Model routing is configured without code changes: `OPENROUTER_LINKING_MODEL` selects the inexpensive model that chooses exact link placements from retrieved passages, while `OPENROUTER_GLOSSARY_MODEL` controls encyclopedia generation. These model names are ordinary, unencrypted production environment values; only the shared API token is secret.
+
 Publishing a post, changing indexed content on a published post, or taking it out of publication automatically queues a per-post incremental index job. The job refreshes every available language, embeds only blocks whose content hash or embedding model changed, rebuilds the affected graph edges, and removes inactive passages on unpublish. Jobs are started by the editor action itself rather than by a permanent polling process, preserving Neon scale-to-zero while retaining durable queued work and bounded retries.
 
 ## Encyclopedia MVP
