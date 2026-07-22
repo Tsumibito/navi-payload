@@ -3,13 +3,14 @@
 import { Button, useDocumentInfo } from '@payloadcms/ui'
 import React, { useCallback, useEffect, useState } from 'react'
 
-type Action = 'editorial' | 'translations' | 'taxonomy' | 'image' | 'full' | 'publish'
+type Action = 'editorial' | 'translations' | 'taxonomy' | 'image' | 'social' | 'full' | 'publish'
 type Status = { publicationStatus?: string; workflow?: { state?: string; completedLocales?: string[]; lastError?: string }; errors?: string[] }
 const actions: Array<{ action: Action; eyebrow: string; title: string; text: string }> = [
   { action: 'editorial', eyebrow: '01 · Current language', title: 'Generate editorial fields', text: 'Summary, SEO title, description, keyphrase, JSON-LD, FAQ and image alt.' },
   { action: 'translations', eyebrow: '02 · Locales', title: 'Generate translations', text: 'Create or regenerate Ukrainian, Russian and English versions with yachting terminology.' },
   { action: 'taxonomy', eyebrow: '03 · Topic cluster', title: 'Build tags and links', text: 'Select existing tags and create outgoing and incoming thematic link plans.' },
   { action: 'image', eyebrow: '04 · Hero', title: 'Generate image', text: 'Use the Hero image prompt. Enable regeneration to replace the current image.' },
+  { action: 'social', eyebrow: '05 · Distribution', title: 'Generate social images', text: 'Create branded square, wide and portrait cards for the n8n publication chain.' },
 ]
 
 export function EditorialWorkflowButton() {

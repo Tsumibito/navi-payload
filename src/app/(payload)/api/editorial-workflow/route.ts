@@ -4,10 +4,11 @@ import { authenticatePayloadRequest, unauthorizedResponse } from '@/utils/authen
 import { localizePostTask, normalizeLexicalRelations } from '@/jobs/localizePost'
 
 const DEFAULT_IMAGE_PROMPT = 'Photorealistic editorial hero image for a professional sailing article. Accurate modern yacht equipment and realistic seamanship context, natural light, clean 16:9 composition, no logos, brands, watermarks or readable interface text.'
-type Action = 'editorial' | 'seo' | 'faq' | 'alt' | 'translations' | 'taxonomy' | 'image' | 'full' | 'publish'
-const ACTION_STAGES: Record<'editorial' | 'translations' | 'taxonomy' | 'image' | 'full', string[]> = {
+type Action = 'editorial' | 'seo' | 'faq' | 'alt' | 'translations' | 'taxonomy' | 'image' | 'social' | 'full' | 'publish'
+const ACTION_STAGES: Record<'editorial' | 'translations' | 'taxonomy' | 'image' | 'social' | 'full', string[]> = {
   editorial: ['source-editorial'], translations: ['translations'], taxonomy: ['taxonomy-links'], image: ['image'],
-  full: ['source-editorial', 'translations', 'taxonomy-links', 'image'],
+  social: ['social-images'],
+  full: ['source-editorial', 'translations', 'taxonomy-links', 'image', 'social-images'],
 }
 
 function hasRichText(value: unknown): boolean {
@@ -38,6 +39,7 @@ async function publicationErrors(payload: any, postId: number | string) {
   }
   const base = await payload.findByID({ collection: 'posts-new', id: postId, locale: 'uk', fallbackLocale: false, depth: 0 }) as any
   if (!base.image) errors.push('Hero image missing')
+  if (!base.socialImages?.thumbnail || !base.socialImages?.image16x9 || !base.socialImages?.image5x4) errors.push('Social images missing')
   if (!(base.tags || []).length) errors.push('Tags missing')
   if (!(base.authors || []).length) errors.push('Author missing')
   return errors
@@ -58,7 +60,7 @@ export async function POST(request: Request) {
   try {
     const { postId, action = 'full', locale: requestedLocale } = await request.json() as { postId?: number | string; action?: Action; locale?: string }
     if (!postId) return NextResponse.json({ error: 'postId is required' }, { status: 400 })
-    if (!['editorial', 'seo', 'faq', 'alt', 'translations', 'taxonomy', 'image', 'full', 'publish'].includes(action)) return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
+    if (!['editorial', 'seo', 'faq', 'alt', 'translations', 'taxonomy', 'image', 'social', 'full', 'publish'].includes(action)) return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
     const { payload } = auth
     const post = await payload.findByID({ collection: 'posts-new', id: postId, locale: 'uk', fallbackLocale: false, depth: 0 }) as any
 
@@ -82,6 +84,7 @@ export async function POST(request: Request) {
       ...(source.localizationWorkflow || {}), sourceLocale, targetLocales: ['uk', 'ru', 'en'], autoRun: true,
       imagePrompt: source.localizationWorkflow?.imagePrompt || DEFAULT_IMAGE_PROMPT,
       regenerateImage: Boolean(source.localizationWorkflow?.regenerateImage), state: 'queued', lastError: null,
+      regenerateSocialImages: action === 'social' || Boolean(source.localizationWorkflow?.regenerateSocialImages),
     }
     const cleanedFAQs = validFAQs(source.faqs)
     await payload.update({
@@ -98,7 +101,7 @@ export async function POST(request: Request) {
     const stages = ['seo', 'faq', 'alt'].includes(action) ? ['source-editorial'] : ACTION_STAGES[action as keyof typeof ACTION_STAGES]
     const fieldScope = ['seo', 'faq', 'alt'].includes(action) ? action : 'all'
     const taskInput = { postId: Number(postId), sourceLocale, targetLocales: ['uk', 'ru', 'en'], changedFields: ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags'], stages, fieldScope }
-    if (['editorial', 'seo', 'faq', 'alt', 'taxonomy', 'image'].includes(action)) {
+    if (['editorial', 'seo', 'faq', 'alt', 'taxonomy', 'image', 'social'].includes(action)) {
       const handler = localizePostTask.handler as any
       await handler({ input: taskInput, req: { payload } })
       return NextResponse.json({ completed: true, postId, sourceLocale, action })

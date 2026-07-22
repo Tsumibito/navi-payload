@@ -4,6 +4,7 @@ import { sql } from '@payloadcms/db-postgres/drizzle'
 import { CONTENT_LOCALES, type ContentLocale, YACHTING_GLOSSARY } from '../config/contentLocales'
 import { buildSeoContentContext, enrichKeywordEntries, serializeKeywords, type AdditionalFieldsValue } from '../utils/seoAnalysis'
 import { generateSlug } from '../utils/slug'
+import { generatePostSocialImages } from '../utils/socialImages'
 
 type LexicalNode = { type?: string; text?: string; children?: LexicalNode[]; [key: string]: unknown }
 type GlossaryTranslation = { locale?: string; term?: string; aliases?: Array<{ value?: string }>; definition?: string; usageNotes?: string; forbiddenVariants?: Array<{ value?: string }>; status?: string }
@@ -172,19 +173,16 @@ function buildGeneratedKeywords(editorial: any, content: unknown, faqs: any[]): 
 async function saveGeneratedKeywords(payload: any, postId: string | number, locale: ContentLocale, focusKeyphrase: string, value: AdditionalFieldsValue) {
   const json = JSON.stringify(value)
   const calculatedAt = new Date().toISOString()
-  const updated = await payload.db.drizzle.execute(sql`
-    UPDATE navi."seo-stats"
-    SET focus_keyphrase = ${focusKeyphrase}, link_keywords = ${json}::jsonb,
-        calculated_at = ${calculatedAt}::timestamp, updated_at = NOW()
-    WHERE entity_type = 'posts-new' AND entity_id = ${String(postId)} AND locale = ${locale}
-    RETURNING id
-  `)
-  if (updated.rows?.length) return
   await payload.db.drizzle.execute(sql`
-    INSERT INTO navi."seo-stats"
-      (entity_type, entity_id, locale, focus_keyphrase, link_keywords, calculated_at, created_at, updated_at)
+    INSERT INTO navi."seo-stats" AS existing
+      (entity_type, entity_id, locale, focus_keyphrase, stats, link_keywords, calculated_at, created_at, updated_at)
     VALUES
-      ('posts-new', ${String(postId)}, ${locale}, ${focusKeyphrase}, ${json}::jsonb, ${calculatedAt}::timestamp, NOW(), NOW())
+      ('posts-new', ${String(postId)}, ${locale}, ${focusKeyphrase}, '{}'::jsonb, ${json}::jsonb, ${calculatedAt}::timestamp, NOW(), NOW())
+    ON CONFLICT (entity_type, entity_id, locale) DO UPDATE SET
+      focus_keyphrase = EXCLUDED.focus_keyphrase,
+      link_keywords = EXCLUDED.link_keywords,
+      calculated_at = EXCLUDED.calculated_at,
+      updated_at = NOW()
   `)
 }
 
@@ -454,7 +452,7 @@ export const localizePostTask: TaskConfig<any> = {
     { name: 'sourceLocale', type: 'select', required: true, options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
     { name: 'targetLocales', type: 'select', hasMany: true, required: true, options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
     { name: 'changedFields', type: 'select', hasMany: true, required: true, options: ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags', 'publicationStatus'].map((value) => ({ label: value, value })) },
-    { name: 'stages', type: 'select', hasMany: true, options: ['source-editorial', 'translations', 'taxonomy-links', 'image'].map((value) => ({ label: value, value })) },
+    { name: 'stages', type: 'select', hasMany: true, options: ['source-editorial', 'translations', 'taxonomy-links', 'image', 'social-images'].map((value) => ({ label: value, value })) },
     { name: 'fieldScope', type: 'select', options: ['all', 'seo', 'faq', 'alt'].map((value) => ({ label: value, value })) },
   ],
   outputSchema: [
@@ -474,13 +472,14 @@ export const localizePostTask: TaskConfig<any> = {
     })
     const targets = [...new Set((input.targetLocales || []).filter((locale: string) => locale !== sourceLocale))] as ContentLocale[]
     const changed = new Set(input.changedFields || ['name', 'content', 'summary', 'image'])
-    const stages = new Set(input.stages?.length ? input.stages : ['source-editorial', 'translations', 'taxonomy-links', 'image'])
+    const stages = new Set(input.stages?.length ? input.stages : ['source-editorial', 'translations', 'taxonomy-links', 'image', 'social-images'])
     const fieldScope = (input.fieldScope || 'all') as 'all' | 'seo' | 'faq' | 'alt'
     const runSourceEditorial = stages.has('source-editorial')
     const runTranslations = stages.has('translations')
     const runTaxonomyLinks = stages.has('taxonomy-links')
     const runImage = stages.has('image')
-    const fullRun = runSourceEditorial && runTranslations && runTaxonomyLinks && runImage
+    const runSocialImages = stages.has('social-images')
+    const fullRun = runSourceEditorial && runTranslations && runTaxonomyLinks && runImage && runSocialImages
     const completed: ContentLocale[] = []
 
     // Candidate extraction is an enrichment step for the complete workflow. A translation-only
@@ -506,6 +505,30 @@ export const localizePostTask: TaskConfig<any> = {
       await req.payload.update({
         collection: 'posts-new', id: source.id, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
         data: { image: image.id, localizationWorkflow: source.localizationWorkflow },
+      })
+    }
+    const hasSocialImages = Boolean(source.socialImages?.thumbnail && source.socialImages?.image16x9 && source.socialImages?.image5x4)
+    if (runSocialImages && (!hasSocialImages || source.localizationWorkflow?.regenerateSocialImages)) {
+      currentStage = 'generating branded social images'
+      const socialImages = await generatePostSocialImages(req.payload, source)
+      source.socialImages = socialImages
+      source.localizationWorkflow = {
+        ...source.localizationWorkflow,
+        regenerateSocialImages: false,
+        socialImageSourceLocale: sourceLocale,
+        lastSocialImagesGeneratedAt: new Date().toISOString(),
+      }
+      await req.payload.update({
+        collection: 'posts-new', id: source.id, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
+        data: {
+          socialImages: {
+            thumbnail: socialImages.thumbnail.id,
+            image16x9: socialImages.image16x9.id,
+            image5x4: socialImages.image5x4.id,
+          },
+          seo: { ...(source.seo || {}), og_image: socialImages.image16x9.id },
+          localizationWorkflow: source.localizationWorkflow,
+        },
       })
     }
     currentStage = 'loading approved source glossary'

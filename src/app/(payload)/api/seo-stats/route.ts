@@ -70,42 +70,28 @@ export async function POST(request: NextRequest) {
     const linkKeywordsJson = link_keywords ? JSON.stringify(link_keywords) : null;
     const calculatedAtVal = calculated_at ?? null;
 
-    // Try update first - ВАЖНО: учитываем locale в WHERE!
-    const updateResult = await payload.db.drizzle.execute(
-      sql`UPDATE navi."seo-stats" 
-          SET 
-            focus_keyphrase = COALESCE(${focusKeyphraseVal}, focus_keyphrase),
-            stats = COALESCE(${statsJson}::jsonb, stats),
-            link_keywords = COALESCE(${linkKeywordsJson}::jsonb, link_keywords),
-            calculated_at = COALESCE(${calculatedAtVal}::timestamp, calculated_at),
-            updated_at = NOW()
-          WHERE entity_type = ${entity_type} 
-            AND entity_id = ${entity_id}
-            AND locale = ${localeVal}
-          RETURNING *`
-    );
-
-    if (updateResult.rows && updateResult.rows.length > 0) {
-      console.log('[seo-stats POST] Updated successfully for locale:', localeVal);
-      return NextResponse.json(updateResult.rows[0]);
-    }
-
-    // If no rows updated, insert new record - ВАЖНО: добавляем locale!
-    console.log('[seo-stats POST] No existing record for locale:', localeVal, '- inserting new');
-    const insertResult = await payload.db.drizzle.execute(
-      sql`INSERT INTO navi."seo-stats" (
+    // One atomic upsert avoids races and always supplies the table's required
+    // focus_keyphrase and stats fields for a locale that does not exist yet.
+    const upsertResult = await payload.db.drizzle.execute(
+      sql`INSERT INTO navi."seo-stats" AS existing (
             entity_type, entity_id, locale, focus_keyphrase, stats, link_keywords, calculated_at, created_at, updated_at
           )
           VALUES (
-            ${entity_type}, ${entity_id}, ${localeVal}, ${focusKeyphraseVal}, 
-            ${statsJson}::jsonb, ${linkKeywordsJson}::jsonb, ${calculatedAtVal}::timestamp,
+            ${entity_type}, ${entity_id}, ${localeVal}, COALESCE(${focusKeyphraseVal}, ''),
+            COALESCE(${statsJson}::jsonb, '{}'::jsonb), ${linkKeywordsJson}::jsonb, ${calculatedAtVal}::timestamp,
             NOW(), NOW()
           )
+          ON CONFLICT (entity_type, entity_id, locale) DO UPDATE SET
+            focus_keyphrase = COALESCE(${focusKeyphraseVal}, existing.focus_keyphrase),
+            stats = COALESCE(${statsJson}::jsonb, existing.stats),
+            link_keywords = COALESCE(${linkKeywordsJson}::jsonb, existing.link_keywords),
+            calculated_at = COALESCE(${calculatedAtVal}::timestamp, existing.calculated_at),
+            updated_at = NOW()
           RETURNING *`
     );
 
-    console.log('[seo-stats POST] Inserted successfully for locale:', localeVal);
-    return NextResponse.json(insertResult.rows[0]);
+    console.log('[seo-stats POST] Saved successfully for locale:', localeVal);
+    return NextResponse.json(upsertResult.rows[0]);
   } catch (error) {
     console.error('[seo-stats POST] Error:', error);
     console.error('[seo-stats POST] Error details:', {

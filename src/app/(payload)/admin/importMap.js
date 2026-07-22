@@ -29,6 +29,7 @@ import { GenerateSlugButton as GenerateSlugButton_68a79d9f857f4400dd1a5091bb544c
 import { GenerateImageAltButton as GenerateImageAltButton_9fc8e6b15e5f66bee095735f06ab4344 } from '../../../../src/components/EditorialFieldActions'
 import { GenerateSummaryButton as GenerateSummaryButton_8f650de01469eb4d0811a209b22855c9 } from '../../../../src/components/GenerateSummaryButton'
 import { DefineTagsButton as DefineTagsButton_3f6daf68463bf4647f221b892f000bd2 } from '../../../../src/components/DefineTagsButton'
+import { GenerateSocialImagesButton as GenerateSocialImagesButton_9fc8e6b15e5f66bee095735f06ab4344 } from '../../../../src/components/EditorialFieldActions'
 import { GenerateSeoFieldsButton as GenerateSeoFieldsButton_9fc8e6b15e5f66bee095735f06ab4344 } from '../../../../src/components/EditorialFieldActions'
 import { GenerateFaqFieldsButton as GenerateFaqFieldsButton_9fc8e6b15e5f66bee095735f06ab4344 } from '../../../../src/components/EditorialFieldActions'
 import { AIFaqGeneratorButton as AIFaqGeneratorButton_989aa69d921d544baad3872686b8d37d } from '../../../../src/components/AIFaqGeneratorButton'
@@ -68,6 +69,7 @@ export const importMap = {
   "/src/components/EditorialFieldActions#GenerateImageAltButton": GenerateImageAltButton_9fc8e6b15e5f66bee095735f06ab4344,
   "/src/components/GenerateSummaryButton#GenerateSummaryButton": GenerateSummaryButton_8f650de01469eb4d0811a209b22855c9,
   "/src/components/DefineTagsButton#DefineTagsButton": DefineTagsButton_3f6daf68463bf4647f221b892f000bd2,
+  "/src/components/EditorialFieldActions#GenerateSocialImagesButton": GenerateSocialImagesButton_9fc8e6b15e5f66bee095735f06ab4344,
   "/src/components/EditorialFieldActions#GenerateSeoFieldsButton": GenerateSeoFieldsButton_9fc8e6b15e5f66bee095735f06ab4344,
   "/src/components/EditorialFieldActions#GenerateFaqFieldsButton": GenerateFaqFieldsButton_9fc8e6b15e5f66bee095735f06ab4344,
   "/src/components/AIFaqGeneratorButton#AIFaqGeneratorButton": AIFaqGeneratorButton_989aa69d921d544baad3872686b8d37d,

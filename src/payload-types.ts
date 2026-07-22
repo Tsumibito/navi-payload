@@ -357,6 +357,9 @@ export interface PostsNew {
     regenerateImage?: boolean | null;
     generatedImageModel?: string | null;
     lastImageGeneratedAt?: string | null;
+    regenerateSocialImages?: boolean | null;
+    socialImageSourceLocale?: string | null;
+    lastSocialImagesGeneratedAt?: string | null;
     state?: ('idle' | 'queued' | 'running' | 'review' | 'failed') | null;
     completedLocales?: ('ru' | 'uk' | 'en')[] | null;
     lastCompletedAt?: string | null;
@@ -1486,6 +1489,9 @@ export interface PostsNewSelect<T extends boolean = true> {
         regenerateImage?: T;
         generatedImageModel?: T;
         lastImageGeneratedAt?: T;
+        regenerateSocialImages?: T;
+        socialImageSourceLocale?: T;
+        lastSocialImagesGeneratedAt?: T;
         state?: T;
         completedLocales?: T;
         lastCompletedAt?: T;
@@ -1928,7 +1934,7 @@ export interface TaskLocalizePost {
     sourceLocale: 'ru' | 'uk' | 'en';
     targetLocales: ('ru' | 'uk' | 'en')[];
     changedFields: ('name' | 'content' | 'summary' | 'image' | 'faqs' | 'authors' | 'tags' | 'publicationStatus')[];
-    stages?: ('source-editorial' | 'translations' | 'taxonomy-links' | 'image')[] | null;
+    stages?: ('source-editorial' | 'translations' | 'taxonomy-links' | 'image' | 'social-images')[] | null;
     fieldScope?: ('all' | 'seo' | 'faq' | 'alt') | null;
   };
   output: {
