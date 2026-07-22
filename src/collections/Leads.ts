@@ -44,6 +44,7 @@ export const Leads: CollectionConfig = {
     { name: 'lastName', type: 'text' },
     { name: 'phone', type: 'text' },
     { name: 'message', type: 'textarea' },
+    { name: 'service', type: 'text' },
     { name: 'locale', type: 'text' },
     { name: 'sourceUrl', type: 'text' },
     { name: 'utm', type: 'text' },

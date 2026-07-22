@@ -11,6 +11,7 @@ import * as migration_20260722_112000_post_social_images from './20260722_112000
 import * as migration_20260722_120000_localized_social_images from './20260722_120000_localized_social_images';
 import * as migration_20260722_130000_subscribers from './20260722_130000_subscribers';
 import * as migration_20260722_140000_internal_link_rag from './20260722_140000_internal_link_rag';
+import * as migration_20260722_210000_lead_service from './20260722_210000_lead_service';
 
 export const migrations = [
   {
@@ -77,5 +78,10 @@ export const migrations = [
     up: migration_20260722_140000_internal_link_rag.up,
     down: migration_20260722_140000_internal_link_rag.down,
     name: '20260722_140000_internal_link_rag'
+  },
+  {
+    up: migration_20260722_210000_lead_service.up,
+    down: migration_20260722_210000_lead_service.down,
+    name: '20260722_210000_lead_service'
   },
 ];

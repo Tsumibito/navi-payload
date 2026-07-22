@@ -78,6 +78,7 @@ export interface Config {
     trainings: Training;
     'glossary-terms': GlossaryTerm;
     leads: Lead;
+    subscribers: Subscriber;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
@@ -97,6 +98,7 @@ export interface Config {
     trainings: TrainingsSelect<false> | TrainingsSelect<true>;
     'glossary-terms': GlossaryTermsSelect<false> | GlossaryTermsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
+    subscribers: SubscribersSelect<false> | SubscribersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -121,6 +123,7 @@ export interface Config {
   jobs: {
     tasks: {
       'localize-post': TaskLocalizePost;
+      'sync-link-index': TaskSyncLinkIndex;
       inline: {
         input: unknown;
         output: unknown;
@@ -696,6 +699,7 @@ export interface TeamNew {
     | null;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * Localized tags managed via native Payload i18n
@@ -1123,6 +1127,28 @@ export interface Lead {
   lastName?: string | null;
   phone?: string | null;
   message?: string | null;
+  service?: string | null;
+  locale?: string | null;
+  sourceUrl?: string | null;
+  utm?: string | null;
+  ip?: string | null;
+  userAgent?: string | null;
+  consentAt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Email newsletter subscribers. Contact requests remain in Leads.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "subscribers".
+ */
+export interface Subscriber {
+  id: number;
+  email: string;
+  status: 'subscribed' | 'unsubscribed';
+  firstName?: string | null;
+  lastName?: string | null;
   locale?: string | null;
   sourceUrl?: string | null;
   utm?: string | null;
@@ -1201,7 +1227,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'localize-post';
+        taskSlug: 'inline' | 'localize-post' | 'sync-link-index';
         taskID: string;
         input?:
           | {
@@ -1234,7 +1260,7 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'localize-post') | null;
+  taskSlug?: ('inline' | 'localize-post' | 'sync-link-index') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -1295,6 +1321,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'leads';
         value: number | Lead;
+      } | null)
+    | ({
+        relationTo: 'subscribers';
+        value: number | Subscriber;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -1629,6 +1659,7 @@ export interface TeamNewSelect<T extends boolean = true> {
       };
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1755,6 +1786,25 @@ export interface LeadsSelect<T extends boolean = true> {
   lastName?: T;
   phone?: T;
   message?: T;
+  service?: T;
+  locale?: T;
+  sourceUrl?: T;
+  utm?: T;
+  ip?: T;
+  userAgent?: T;
+  consentAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "subscribers_select".
+ */
+export interface SubscribersSelect<T extends boolean = true> {
+  email?: T;
+  status?: T;
+  firstName?: T;
+  lastName?: T;
   locale?: T;
   sourceUrl?: T;
   utm?: T;
@@ -1941,6 +1991,22 @@ export interface TaskLocalizePost {
   };
   output: {
     completedLocales?: ('ru' | 'uk' | 'en')[] | null;
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskSync-link-index".
+ */
+export interface TaskSyncLinkIndex {
+  input: {
+    postId: number;
+  };
+  output: {
+    indexedLocales?: ('ru' | 'uk' | 'en')[] | null;
+    passages?: number | null;
+    embedded?: number | null;
+    links?: number | null;
+    purged?: boolean | null;
   };
 }
 /**

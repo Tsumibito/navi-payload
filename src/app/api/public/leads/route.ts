@@ -1,5 +1,6 @@
 import config from '@payload-config'
 import { getPayload } from 'payload'
+import { sendLeadEmails, sendSubscriberEmails, syncBrevoSubscriber } from '@/lib/brevo'
 
 const allowedOrigins = [
   /^https:\/\/(?:www\.)?navi\.training$/,
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
   if (String(input.company || '').trim()) return Response.json({ ok: true }, { headers })
 
   const email = String(input.email || '').trim().toLowerCase()
-  const kind = input.kind === 'contact' ? 'contact' : input.kind === 'newsletter' ? 'newsletter' : null
+  const kind = input.kind === 'newsletter' ? 'newsletter' : ['contact', 'service'].includes(String(input.kind)) ? 'contact' : null
   if (!kind || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || input.consent !== true) {
     return Response.json({ ok: false, error: 'invalid_fields' }, { status: 422, headers })
   }
@@ -61,7 +62,18 @@ export async function POST(request: Request) {
       limit: 1,
       overrideAccess: true,
     })
-    if (existing.totalDocs) return Response.json({ ok: true, existing: true }, { headers })
+    if (existing.totalDocs) {
+      try {
+        await syncBrevoSubscriber({
+          email,
+          firstName: clean(input.firstName, 120),
+          lastName: clean(input.lastName, 120),
+        })
+      } catch (error) {
+        console.error('Existing subscriber sync failed', error instanceof Error ? error.message : 'unknown error')
+      }
+      return Response.json({ ok: true, existing: true }, { headers })
+    }
     await database.create({
       collection: 'subscribers',
       overrideAccess: true,
@@ -78,6 +90,17 @@ export async function POST(request: Request) {
         consentAt: new Date().toISOString(),
       },
     })
+    try {
+      await sendSubscriberEmails({
+        email,
+        firstName: clean(input.firstName, 120),
+        lastName: clean(input.lastName, 120),
+        locale: clean(input.locale, 8),
+        sourceUrl: clean(input.sourceUrl, 500),
+      })
+    } catch (error) {
+      console.error('Subscriber email delivery failed', error instanceof Error ? error.message : 'unknown error')
+    }
     return Response.json({ ok: true }, { status: 201, headers })
   }
 
@@ -92,6 +115,7 @@ export async function POST(request: Request) {
       lastName: clean(input.lastName, 120),
       phone: clean(input.phone, 80),
       message: clean(input.message, 3000),
+      service: clean(input.service, 160),
       locale: clean(input.locale, 8),
       sourceUrl: clean(input.sourceUrl, 500),
       utm: clean(input.utm, 1000),
@@ -100,6 +124,21 @@ export async function POST(request: Request) {
       consentAt: new Date().toISOString(),
     },
   })
+
+  try {
+    await sendLeadEmails({
+      email,
+      firstName: clean(input.firstName, 120),
+      lastName: clean(input.lastName, 120),
+      phone: clean(input.phone, 80),
+      message: clean(input.message, 3000),
+      service: clean(input.service, 160),
+      locale: clean(input.locale, 8),
+      sourceUrl: clean(input.sourceUrl, 500),
+    })
+  } catch (error) {
+    console.error('Lead email delivery failed', error instanceof Error ? error.message : 'unknown error')
+  }
 
   return Response.json({ ok: true }, { status: 201, headers })
 }
