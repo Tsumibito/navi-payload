@@ -2,11 +2,12 @@ import type { Field } from 'payload';
 
 type SeoFieldOptions = {
   localized?: boolean;
+  localizedImage?: boolean;
   includeOverview?: boolean;
 };
 
 export const createSeoField = (
-  { localized = false, includeOverview = false }: SeoFieldOptions = {}
+  { localized = false, localizedImage = false, includeOverview = false }: SeoFieldOptions = {}
 ): Field => {
   const localizedProps = localized ? { localized: true as const } : undefined;
 
@@ -53,6 +54,7 @@ export const createSeoField = (
       name: 'og_image',
       label: 'Open Graph Image',
       relationTo: 'media',
+      ...(localizedImage ? { localized: true as const } : {}),
       admin: {
         components: {
           afterField: '/src/components/OgImageActions#OgImageActions',

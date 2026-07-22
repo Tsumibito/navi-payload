@@ -4,13 +4,18 @@ import { Button, useDocumentInfo } from '@payloadcms/ui'
 import React, { useCallback, useEffect, useState } from 'react'
 
 type Action = 'editorial' | 'translations' | 'taxonomy' | 'image' | 'social' | 'full' | 'publish'
-type Status = { publicationStatus?: string; workflow?: { state?: string; completedLocales?: string[]; lastError?: string }; errors?: string[] }
-const actions: Array<{ action: Action; eyebrow: string; title: string; text: string }> = [
-  { action: 'editorial', eyebrow: '01 · Current language', title: 'Generate editorial fields', text: 'Summary, SEO title, description, keyphrase, JSON-LD, FAQ and image alt.' },
-  { action: 'translations', eyebrow: '02 · Locales', title: 'Generate translations', text: 'Create or regenerate Ukrainian, Russian and English versions with yachting terminology.' },
-  { action: 'taxonomy', eyebrow: '03 · Topic cluster', title: 'Build tags and links', text: 'Select existing tags and create outgoing and incoming thematic link plans.' },
-  { action: 'image', eyebrow: '04 · Hero', title: 'Generate image', text: 'Use the Hero image prompt. Enable regeneration to replace the current image.' },
-  { action: 'social', eyebrow: '05 · Distribution', title: 'Generate social images', text: 'Create branded square, wide and portrait cards for the n8n publication chain.' },
+type Status = {
+  publicationStatus?: string
+  workflow?: { state?: string; currentStage?: string; completedLocales?: string[]; lastError?: string }
+  assets?: { hero?: boolean; social?: Record<string, boolean> }
+  errors?: string[]
+}
+const actions: Array<{ action: Action; eyebrow: string; title: string; text: string; asset?: 'hero' | 'social' }> = [
+  { action: 'editorial', eyebrow: 'Current language', title: 'Generate editorial fields', text: 'Summary, SEO title, description, keyphrase, JSON-LD, FAQ and image alt.' },
+  { action: 'translations', eyebrow: 'Languages', title: 'Generate translations', text: 'Create Ukrainian, Russian and English versions with yachting terminology.' },
+  { action: 'taxonomy', eyebrow: 'Topic cluster', title: 'Build tags and links', text: 'Select tags and prepare outgoing and incoming thematic links.' },
+  { action: 'image', eyebrow: 'Optional · Hero', title: 'Generate image', text: 'Automatic when no Featured Image exists. Use this action only to create or deliberately replace it.', asset: 'hero' },
+  { action: 'social', eyebrow: 'Automatic · Distribution', title: 'Generate social images', text: 'One localized square, wide and portrait set for each language. Prepare everything creates missing sets automatically.', asset: 'social' },
 ]
 
 export function EditorialWorkflowButton() {
@@ -29,13 +34,19 @@ export function EditorialWorkflowButton() {
 
   const refresh = useCallback(async () => {
     if (!id) return
-    const response = await fetch(`/api/editorial-workflow?postId=${id}`)
-    if (response.ok) setStatus(await response.json())
+    const response = await fetch(`/api/editorial-workflow?postId=${id}`, { cache: 'no-store' })
+    if (!response.ok) return
+    const next = await response.json() as Status
+    setStatus(next)
+    const nextState = next.workflow?.state || 'idle'
+    if (nextState === 'queued' || nextState === 'running') setMessage(next.workflow?.currentStage || 'Workflow is running…')
+    if (nextState === 'review') setMessage('Ready for the next editorial action.')
+    if (nextState === 'failed') setMessage('Workflow stopped. See the exact failing stage below.')
   }, [id])
   useEffect(() => { void refresh() }, [refresh])
   useEffect(() => {
     if (!['queued', 'running'].includes(status.workflow?.state || '')) return
-    const timer = window.setInterval(() => { void refresh() }, 6000)
+    const timer = window.setInterval(() => { void refresh() }, 3000)
     return () => window.clearInterval(timer)
   }, [refresh, status.workflow?.state])
 
@@ -59,6 +70,8 @@ export function EditorialWorkflowButton() {
   if (!id) return <p>Сначала сохраните новую статью.</p>
   const workflowState = status.workflow?.state || 'idle'
   const publication = status.publicationStatus || 'draft'
+  const workflowBusy = Boolean(active) || ['queued', 'running'].includes(workflowState)
+  const socialReadyCount = ['ru', 'uk', 'en'].filter((locale) => status.assets?.social?.[locale]).length
   return (
     <section style={{ margin: '0 0 24px', border: '1px solid var(--theme-elevation-150)', borderRadius: 12, overflow: 'hidden', background: 'var(--theme-elevation-0)' }}>
       <header style={{ padding: '20px 22px', background: 'linear-gradient(120deg, #082f49, #075985 68%, #0e7490)', color: '#fff' }}>
@@ -68,15 +81,17 @@ export function EditorialWorkflowButton() {
         </div>
       </header>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', borderBottom: '1px solid var(--theme-elevation-150)' }}>
-        {actions.map((item) => <div key={item.action} style={{ padding: 18, borderRight: '1px solid var(--theme-elevation-150)', minHeight: 174 }}>
-          <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: '#0e7490', fontWeight: 700 }}>{item.eyebrow}</div>
+        {actions.map((item) => {
+          const ready = item.asset === 'hero' ? Boolean(status.assets?.hero) : item.asset === 'social' ? socialReadyCount === 3 : false
+          return <div key={item.action} style={{ padding: 18, borderRight: '1px solid var(--theme-elevation-150)', minHeight: 190 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}><span style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: '#0e7490', fontWeight: 700 }}>{item.eyebrow}</span>{item.asset && <span style={{ padding: '3px 7px', borderRadius: 999, fontSize: 10, fontWeight: 700, background: ready ? '#dcfce7' : '#fef3c7', color: ready ? '#166534' : '#92400e' }}>{item.asset === 'social' ? `${socialReadyCount}/3 languages` : ready ? 'Ready' : 'Missing'}</span>}</div>
           <h4 style={{ margin: '8px 0 7px', fontSize: 16 }}>{item.title}</h4><p style={{ minHeight: 48, margin: '0 0 14px', color: 'var(--theme-elevation-600)', lineHeight: 1.45 }}>{item.text}</p>
-          <Button type="button" size="small" buttonStyle="secondary" disabled={Boolean(active)} onClick={() => run(item.action)}>{active === item.action ? 'Running…' : item.title}</Button>
-        </div>)}
+          <Button type="button" size="small" buttonStyle="secondary" disabled={workflowBusy} onClick={() => run(item.action)}>{active === item.action ? 'Running…' : ready ? `Regenerate ${item.asset === 'hero' ? 'hero' : 'all languages'}` : item.title}</Button>
+        </div>})}
       </div>
       <footer style={{ padding: 18, display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', background: 'var(--theme-elevation-50)' }}>
-        <div><strong>{message || 'Ready for the next editorial action.'}</strong>{error && <div style={{ color: 'var(--theme-error-500)', marginTop: 5 }}>{error}</div>}{status.workflow?.lastError && <div style={{ color: 'var(--theme-error-500)', marginTop: 5 }}>Last workflow error: {status.workflow.lastError}</div>}</div>
-        <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}><Button type="button" disabled={Boolean(active)} onClick={() => run('full')}>{active === 'full' ? 'Preparing…' : 'Prepare everything'}</Button><Button type="button" buttonStyle="secondary" disabled={Boolean(active) || publication !== 'ready'} onClick={() => run('publish')}>Publish</Button></div>
+        <div><strong>{message || 'Ready for the next editorial action.'}</strong>{['queued', 'running'].includes(workflowState) && <div style={{ marginTop: 7, fontSize: 12, color: 'var(--theme-elevation-600)' }}>Live status refreshes automatically every 3 seconds.</div>}{status.workflow?.completedLocales?.length ? <div style={{ marginTop: 7, fontSize: 12, color: 'var(--theme-elevation-600)' }}>Completed languages: {status.workflow.completedLocales.map((locale) => locale.toUpperCase()).join(' · ')}</div> : null}{error && <div style={{ color: 'var(--theme-error-500)', marginTop: 5 }}>{error}</div>}{status.workflow?.lastError && <div style={{ color: 'var(--theme-error-500)', marginTop: 5 }}>Last workflow error: {status.workflow.lastError}</div>}</div>
+        <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}><Button type="button" disabled={workflowBusy} onClick={() => run('full')}>{active === 'full' ? 'Preparing…' : 'Prepare everything'}</Button><Button type="button" buttonStyle="secondary" disabled={workflowBusy || publication !== 'ready'} onClick={() => run('publish')}>Publish</Button></div>
       </footer>
     </section>
   )

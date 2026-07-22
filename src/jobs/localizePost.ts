@@ -466,10 +466,19 @@ export const localizePostTask: TaskConfig<any> = {
     if (!source.name || !source.content) throw new Error(`Source locale ${sourceLocale} has no title or content`)
     currentStage = 'normalizing source Lexical content'
     source.content = normalizeLexicalRelations(source.content)
+    source.localizationWorkflow = { ...(source.localizationWorkflow || {}), state: 'running', currentStage: 'Preparing the source article', lastError: null }
     await req.payload.update({
       collection: 'posts-new', id: input.postId, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
-      data: { content: source.content, localizationWorkflow: { ...(source.localizationWorkflow || {}), state: 'running', lastError: null } },
+      data: { content: source.content, localizationWorkflow: source.localizationWorkflow },
     })
+    const reportStage = async (stage: string) => {
+      currentStage = stage
+      source.localizationWorkflow = { ...(source.localizationWorkflow || {}), state: 'running', currentStage: stage, lastError: null }
+      await req.payload.update({
+        collection: 'posts-new', id: source.id, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
+        data: { localizationWorkflow: source.localizationWorkflow },
+      })
+    }
     const targets = [...new Set((input.targetLocales || []).filter((locale: string) => locale !== sourceLocale))] as ContentLocale[]
     const changed = new Set(input.changedFields || ['name', 'content', 'summary', 'image'])
     const stages = new Set(input.stages?.length ? input.stages : ['source-editorial', 'translations', 'taxonomy-links', 'image', 'social-images'])
@@ -497,6 +506,7 @@ export const localizePostTask: TaskConfig<any> = {
       source.tags = refreshed.tags
     }
     if (runImage && source.localizationWorkflow?.imagePrompt && (!source.image || source.localizationWorkflow?.regenerateImage)) {
+      await reportStage('Generating the hero image')
       const image = await generateHeroImage(req.payload, source.localizationWorkflow.imagePrompt, source.name)
       source.image = image
       source.localizationWorkflow = {
@@ -507,31 +517,7 @@ export const localizePostTask: TaskConfig<any> = {
         data: { image: image.id, localizationWorkflow: source.localizationWorkflow },
       })
     }
-    const hasSocialImages = Boolean(source.socialImages?.thumbnail && source.socialImages?.image16x9 && source.socialImages?.image5x4)
-    if (runSocialImages && (!hasSocialImages || source.localizationWorkflow?.regenerateSocialImages)) {
-      currentStage = 'generating branded social images'
-      const socialImages = await generatePostSocialImages(req.payload, source)
-      source.socialImages = socialImages
-      source.localizationWorkflow = {
-        ...source.localizationWorkflow,
-        regenerateSocialImages: false,
-        socialImageSourceLocale: sourceLocale,
-        lastSocialImagesGeneratedAt: new Date().toISOString(),
-      }
-      await req.payload.update({
-        collection: 'posts-new', id: source.id, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
-        data: {
-          socialImages: {
-            thumbnail: socialImages.thumbnail.id,
-            image16x9: socialImages.image16x9.id,
-            image5x4: socialImages.image5x4.id,
-          },
-          seo: { ...(source.seo || {}), og_image: socialImages.image16x9.id },
-          localizationWorkflow: source.localizationWorkflow,
-        },
-      })
-    }
-    currentStage = 'loading approved source glossary'
+    await reportStage('Preparing editorial fields for the source language')
     const sourceGlossary = await loadApprovedGlossary(req.payload, source.content, sourceLocale, sourceLocale)
 
     const sourceEditorial = runSourceEditorial && fieldScope !== 'faq'
@@ -580,7 +566,7 @@ export const localizePostTask: TaskConfig<any> = {
     completed.push(sourceLocale)
 
     if (runTranslations) for (const target of targets) {
-      currentStage = `${target}: loading current locale`
+      await reportStage(`Translating and preparing ${target.toUpperCase()}`)
       const current = await req.payload.findByID({ collection: 'posts-new', id: source.id, locale: target, fallbackLocale: false, depth: 0 }) as any
       currentStage = `${target}: loading approved glossary`
       const glossary = await loadApprovedGlossary(req.payload, source.content, sourceLocale, target)
@@ -626,13 +612,43 @@ export const localizePostTask: TaskConfig<any> = {
       completed.push(target)
     }
 
+    if (runSocialImages) {
+      const regenerate = Boolean(source.localizationWorkflow?.regenerateSocialImages)
+      const socialLocales = [...new Set([sourceLocale, ...targets])] as ContentLocale[]
+      for (const locale of socialLocales) {
+        await reportStage(`Generating social images for ${locale.toUpperCase()}`)
+        const localizedPost = await req.payload.findByID({ collection: 'posts-new', id: source.id, locale, fallbackLocale: false, depth: 0 }) as any
+        const hasSocialImages = Boolean(localizedPost.socialImages?.thumbnail && localizedPost.socialImages?.image16x9 && localizedPost.socialImages?.image5x4)
+        if (hasSocialImages && !regenerate) continue
+        if (!localizedPost.name) throw new Error(`${locale}: title is required before generating social images`)
+        const socialImages = await generatePostSocialImages(req.payload, localizedPost)
+        await req.payload.update({
+          collection: 'posts-new', id: source.id, locale, context: { skipLocalizationWorkflow: true },
+          data: {
+            socialImages: {
+              thumbnail: socialImages.thumbnail.id,
+              image16x9: socialImages.image16x9.id,
+              image5x4: socialImages.image5x4.id,
+            },
+            seo: { ...(localizedPost.seo || {}), og_image: socialImages.image16x9.id },
+          },
+        })
+      }
+      source.localizationWorkflow = {
+        ...source.localizationWorkflow,
+        regenerateSocialImages: false,
+        socialImageSourceLocale: socialLocales.join(', '),
+        lastSocialImagesGeneratedAt: new Date().toISOString(),
+      }
+    }
+
     await req.payload.update({
       collection: 'posts-new', id: source.id, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
       data: {
         publicationStatus: source.publicationStatus === 'published' ? 'published' : fullRun ? 'ready' : 'review',
         localizationWorkflow: {
           ...(source.localizationWorkflow || {}), state: 'review', completedLocales: completed,
-          lastCompletedAt: new Date().toISOString(), lastError: null,
+          currentStage: 'Ready for the next editorial action', lastCompletedAt: new Date().toISOString(), lastError: null,
         },
       },
     })
@@ -642,7 +658,7 @@ export const localizePostTask: TaskConfig<any> = {
       const message = error instanceof Error ? error.message : String(error)
       await req.payload.update({
         collection: 'posts-new', id: input.postId, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
-        data: { localizationWorkflow: { ...(failedPost?.localizationWorkflow || {}), state: 'failed', lastError: `${currentStage}: ${message}`.slice(0, 1000) } },
+        data: { localizationWorkflow: { ...(failedPost?.localizationWorkflow || {}), state: 'failed', currentStage, lastError: `${currentStage}: ${message}`.slice(0, 1000) } },
       })
       throw error
     }

@@ -360,6 +360,7 @@ export interface PostsNew {
     regenerateSocialImages?: boolean | null;
     socialImageSourceLocale?: string | null;
     lastSocialImagesGeneratedAt?: string | null;
+    currentStage?: string | null;
     state?: ('idle' | 'queued' | 'running' | 'review' | 'failed') | null;
     completedLocales?: ('ru' | 'uk' | 'en')[] | null;
     lastCompletedAt?: string | null;
@@ -1492,6 +1493,7 @@ export interface PostsNewSelect<T extends boolean = true> {
         regenerateSocialImages?: T;
         socialImageSourceLocale?: T;
         lastSocialImagesGeneratedAt?: T;
+        currentStage?: T;
         state?: T;
         completedLocales?: T;
         lastCompletedAt?: T;

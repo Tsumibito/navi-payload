@@ -29,20 +29,24 @@ function validFAQs(value: unknown): any[] {
   return value.filter((faq) => typeof faq?.question === 'string' && faq.question.trim() && hasRichText(faq.answer))
 }
 
-async function publicationErrors(payload: any, postId: number | string) {
+async function publicationReadiness(payload: any, postId: number | string) {
   const errors: string[] = []
+  const social: Record<string, boolean> = {}
+  let hero = false
   for (const locale of ['uk', 'ru', 'en']) {
     const post = await payload.findByID({ collection: 'posts-new', id: postId, locale, fallbackLocale: false, depth: 0 }) as any
+    hero ||= Boolean(post.image)
+    social[locale] = Boolean(post.socialImages?.thumbnail && post.socialImages?.image16x9 && post.socialImages?.image5x4)
     if (!post.name || !post.content || !post.summary) errors.push(`${locale}: title, content or summary missing`)
     if (!post.seo?.title || !post.seo?.meta_description || !post.seo?.json_ld) errors.push(`${locale}: SEO or JSON-LD missing`)
     if (validFAQs(post.faqs).length < 4) errors.push(`${locale}: fewer than 4 valid FAQs`)
+    if (!social[locale]) errors.push(`${locale}: social images missing`)
   }
   const base = await payload.findByID({ collection: 'posts-new', id: postId, locale: 'uk', fallbackLocale: false, depth: 0 }) as any
   if (!base.image) errors.push('Hero image missing')
-  if (!base.socialImages?.thumbnail || !base.socialImages?.image16x9 || !base.socialImages?.image5x4) errors.push('Social images missing')
   if (!(base.tags || []).length) errors.push('Tags missing')
   if (!(base.authors || []).length) errors.push('Author missing')
-  return errors
+  return { errors, assets: { hero, social } }
 }
 
 export async function GET(request: Request) {
@@ -51,7 +55,11 @@ export async function GET(request: Request) {
   const postId = new URL(request.url).searchParams.get('postId')
   if (!postId) return NextResponse.json({ error: 'postId is required' }, { status: 400 })
   const post = await auth.payload.findByID({ collection: 'posts-new', id: postId, locale: 'uk', fallbackLocale: false, depth: 0 }) as any
-  return NextResponse.json({ publicationStatus: post.publicationStatus, workflow: post.localizationWorkflow, errors: await publicationErrors(auth.payload, postId) })
+  const readiness = await publicationReadiness(auth.payload, postId)
+  return NextResponse.json(
+    { publicationStatus: post.publicationStatus, workflow: post.localizationWorkflow, ...readiness },
+    { headers: { 'Cache-Control': 'no-store, max-age=0' } },
+  )
 }
 
 export async function POST(request: Request) {
@@ -74,7 +82,7 @@ export async function POST(request: Request) {
     const source = sourceLocale === 'uk' ? post : await payload.findByID({ collection: 'posts-new', id: postId, locale: sourceLocale, fallbackLocale: false, depth: 0 }) as any
     if (!source.name || !source.content) return NextResponse.json({ error: `Source locale ${sourceLocale} has no title or content` }, { status: 400 })
     if (action === 'publish') {
-      const errors = await publicationErrors(payload, postId)
+      const { errors } = await publicationReadiness(payload, postId)
       if (errors.length) return NextResponse.json({ error: 'Статья не готова к публикации', errors }, { status: 409 })
       await payload.update({ collection: 'posts-new', id: postId, locale: sourceLocale, context: { skipLocalizationWorkflow: true }, data: { publicationStatus: 'published' } })
       await payload.jobs.queue({ task: 'localize-post' as never, queue: 'content-localization', input: { postId: Number(postId), sourceLocale, targetLocales: ['uk', 'ru', 'en'], changedFields: ['publicationStatus'], stages: ['taxonomy-links'] } as never })
@@ -83,7 +91,7 @@ export async function POST(request: Request) {
     const workflow = {
       ...(source.localizationWorkflow || {}), sourceLocale, targetLocales: ['uk', 'ru', 'en'], autoRun: true,
       imagePrompt: source.localizationWorkflow?.imagePrompt || DEFAULT_IMAGE_PROMPT,
-      regenerateImage: Boolean(source.localizationWorkflow?.regenerateImage), state: 'queued', lastError: null,
+      regenerateImage: action === 'image' || Boolean(source.localizationWorkflow?.regenerateImage), state: 'queued', currentStage: 'Queued — waiting for the worker', lastError: null,
       regenerateSocialImages: action === 'social' || Boolean(source.localizationWorkflow?.regenerateSocialImages),
     }
     const cleanedFAQs = validFAQs(source.faqs)
@@ -101,7 +109,7 @@ export async function POST(request: Request) {
     const stages = ['seo', 'faq', 'alt'].includes(action) ? ['source-editorial'] : ACTION_STAGES[action as keyof typeof ACTION_STAGES]
     const fieldScope = ['seo', 'faq', 'alt'].includes(action) ? action : 'all'
     const taskInput = { postId: Number(postId), sourceLocale, targetLocales: ['uk', 'ru', 'en'], changedFields: ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags'], stages, fieldScope }
-    if (['editorial', 'seo', 'faq', 'alt', 'taxonomy', 'image', 'social'].includes(action)) {
+    if (['editorial', 'seo', 'faq', 'alt', 'taxonomy'].includes(action)) {
       const handler = localizePostTask.handler as any
       await handler({ input: taskInput, req: { payload } })
       return NextResponse.json({ completed: true, postId, sourceLocale, action })

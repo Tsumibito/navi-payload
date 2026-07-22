@@ -116,8 +116,9 @@ export const Posts: CollectionConfig = {
                 { type: 'text', name: 'generatedImageModel', label: 'Last image model', admin: { readOnly: true } },
                 { type: 'date', name: 'lastImageGeneratedAt', label: 'Last image generation', admin: { readOnly: true } },
                 { type: 'checkbox', name: 'regenerateSocialImages', label: 'Regenerate social images on next workflow run', defaultValue: false },
-                { type: 'text', name: 'socialImageSourceLocale', label: 'Social image title language', admin: { readOnly: true } },
+                { type: 'text', name: 'socialImageSourceLocale', label: 'Social image languages', admin: { readOnly: true } },
                 { type: 'date', name: 'lastSocialImagesGeneratedAt', label: 'Last social image generation', admin: { readOnly: true } },
+                { type: 'text', name: 'currentStage', label: 'Current workflow stage', admin: { readOnly: true } },
                 { type: 'select', name: 'state', label: 'Workflow state', defaultValue: 'idle', admin: { readOnly: true }, options: ['idle', 'queued', 'running', 'review', 'failed'].map((value) => ({ label: value, value })) },
                 { type: 'select', name: 'completedLocales', label: 'Completed locales', hasMany: true, admin: { readOnly: true }, options: CONTENT_LOCALES.map(({ code, label }) => ({ value: code, label })) },
                 { type: 'date', name: 'lastCompletedAt', label: 'Last completed', admin: { readOnly: true } },
@@ -245,21 +246,21 @@ export const Posts: CollectionConfig = {
                   name: 'thumbnail',
                   label: 'Thumbnail',
                   relationTo: 'media',
-                  // НЕ локализовано
+                  localized: true,
                 },
                 {
                   type: 'upload',
                   name: 'image16x9',
                   label: 'Image 16:9',
                   relationTo: 'media',
-                  // НЕ локализовано
+                  localized: true,
                 },
                 {
                   type: 'upload',
                   name: 'image5x4',
                   label: 'Portrait Image 4:5',
                   relationTo: 'media',
-                  // НЕ локализовано
+                  localized: true,
                 },
               ],
             },
@@ -269,7 +270,7 @@ export const Posts: CollectionConfig = {
           label: 'SEO',
           fields: [
             { type: 'ui', name: 'generateSeoFields', admin: { components: { Field: '/src/components/EditorialFieldActions#GenerateSeoFieldsButton' } } },
-            createSeoField({ localized: true }),
+            createSeoField({ localized: true, localizedImage: true }),
           ],
         },
         {
