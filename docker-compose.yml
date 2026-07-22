@@ -24,7 +24,8 @@ services:
       - BASEROW_API_KEY=${BASEROW_API_KEY}
       - DATAFORSEO_API_KEY=${DATAFORSEO_API_KEY}
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/admin"]
+      # This route is force-static and never initializes Payload or Postgres.
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

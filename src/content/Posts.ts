@@ -78,6 +78,12 @@ export const Posts: CollectionConfig = {
             localizationWorkflow: { ...doc.localizationWorkflow, state: 'queued', lastError: null },
           },
         });
+        // The long-running cron runner used to poll Postgres every minute and
+        // prevented Neon from scaling to zero. Run the queue only after an
+        // editor action has actually enqueued work.
+        void req.payload.jobs.run({ queue: 'content-localization', limit: 1 }).catch((error) => {
+          req.payload.logger.error({ err: error }, 'On-demand localization worker failed');
+        });
         return doc;
       },
     ],

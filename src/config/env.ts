@@ -29,6 +29,11 @@ const positiveInteger = (name: string, fallback: number): number => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
 
+const nonNegativeInteger = (name: string, fallback: number): number => {
+  const parsed = Number.parseInt(process.env[name] || '', 10)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
+}
+
 export const env = {
   payloadSecret: required('PAYLOAD_SECRET'),
   ssgApiKey: required('PAYLOAD_SSG_API_KEY'),
@@ -43,7 +48,9 @@ export const env = {
     publicUrl: url('CLOUDFLARE_R2_PUBLIC_URL'),
   },
   databasePool: {
-    min: positiveInteger('DATABASE_POOL_MIN', 1),
+    // Do not retain a floor of idle client connections. Neon can close an empty
+    // pool and suspend the compute after its configured inactivity window.
+    min: nonNegativeInteger('DATABASE_POOL_MIN', 0),
     max: positiveInteger('DATABASE_POOL_MAX', 10),
     idleTimeoutMillis: positiveInteger('DATABASE_POOL_IDLE_TIMEOUT_MS', 60_000),
     connectionTimeoutMillis: positiveInteger('DATABASE_POOL_CONNECTION_TIMEOUT_MS', 10_000),

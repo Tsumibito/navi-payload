@@ -56,6 +56,7 @@ export default buildConfig({
     schemaName: env.databaseSchema,
     pool: {
       connectionString: env.databaseUri,
+      application_name: 'navi-payload',
       ...env.databasePool,
     },
     push: false,
@@ -89,6 +90,5 @@ export default buildConfig({
   jobs: {
     enableConcurrencyControl: true,
     tasks: [localizePostTask],
-    autoRun: [{ cron: '* * * * *', queue: 'content-localization', limit: 1 }],
   },
 })
