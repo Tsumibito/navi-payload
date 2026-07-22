@@ -142,22 +142,55 @@ export async function embedPassages(texts: string[]): Promise<number[][]> {
   if (!texts.length) return []
   const token = process.env.OPENROUTER_TOKEN?.trim()
   if (!token) throw new Error('OPENROUTER_TOKEN is not configured')
+  const batches: string[][] = []
+  for (let offset = 0; offset < texts.length; offset += 24) batches.push(texts.slice(offset, offset + 24))
+
+  const embedBatch = async (batch: string[]): Promise<number[][]> => {
+    const controller = new AbortController()
+    let timedOut = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const request = (async () => {
+      const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': process.env.PAYLOAD_PUBLIC_SERVER_URL?.trim() || 'https://payload.navi.training',
+          'X-Title': 'Navi.training internal linking',
+        },
+        body: JSON.stringify({ model: embeddingModel(), input: batch, encoding_format: 'float' }),
+      })
+      if (!response.ok) throw new Error(`OpenRouter embeddings ${response.status}: ${(await response.text()).slice(0, 500)}`)
+      return parseEmbeddingResponse(await response.json())
+    })()
+    try {
+      return await Promise.race([
+        request,
+        new Promise<number[][]>((_, reject) => {
+          timer = setTimeout(() => {
+            timedOut = true
+            controller.abort()
+            reject(new Error(`OpenRouter embeddings timed out for batch of ${batch.length}`))
+          }, 20_000)
+        }),
+      ])
+    } catch (error) {
+      if (!timedOut || batch.length === 1 || process.env.LINK_INDEX_FAST_FAIL === '1') throw error
+      const middle = Math.ceil(batch.length / 2)
+      const [left, right] = await Promise.all([embedBatch(batch.slice(0, middle)), embedBatch(batch.slice(middle))])
+      return [...left, ...right]
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
+  }
+
+  // OpenRouter accepts batched inputs. A small concurrency window makes the
+  // one-time corpus backfill practical without creating an unbounded burst.
   const output: number[][] = []
-  for (let offset = 0; offset < texts.length; offset += 24) {
-    const batch = texts.slice(offset, offset + 24)
-    const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': process.env.PAYLOAD_PUBLIC_SERVER_URL?.trim() || 'https://payload.navi.training',
-        'X-Title': 'Navi.training internal linking',
-      },
-      body: JSON.stringify({ model: embeddingModel(), input: batch, encoding_format: 'float' }),
-    })
-    if (!response.ok) throw new Error(`OpenRouter embeddings ${response.status}: ${(await response.text()).slice(0, 500)}`)
-    const body = await response.json()
-    output.push(...parseEmbeddingResponse(body))
+  for (let offset = 0; offset < batches.length; offset += 8) {
+    const group = await Promise.all(batches.slice(offset, offset + 8).map(embedBatch))
+    group.forEach((matrix) => output.push(...matrix))
   }
   return output
 }
@@ -210,7 +243,10 @@ export async function syncPostLinkIndex(payload: any, post: any, locale: Content
     const cached = existing.get(passage.nodePath)
     return cached?.hash !== passage.contentHash || cached.model !== model
   })
-  const embeddings = await embedPassages(changed.map((passage) => passage.content))
+  // A semantic block can contain a very long imported list. BGE-M3 does not
+  // need the entire block to identify its topic, and bounding each input keeps
+  // batch latency predictable during the initial corpus backfill.
+  const embeddings = await embedPassages(changed.map((passage) => passage.content.slice(0, 2_400)))
   const changedEmbedding = new Map(changed.map((passage, index) => [passage.nodePath, embeddings[index]]))
   const tags = tagIds(post)
   const routes = await routeMap(payload, locale)
@@ -229,28 +265,53 @@ export async function syncPostLinkIndex(payload: any, post: any, locale: Content
       await client.query('DELETE FROM navi.link_passages WHERE post_id = $1 AND locale = $2', [post.id, locale])
     }
 
-    for (const passage of passages) {
-      const vector = changedEmbedding.get(passage.nodePath)
-      if (vector) {
-        await client.query(
-          `INSERT INTO navi.link_passages
-            (post_id, locale, node_path, node_type, heading, content, content_hash, tags, existing_links, embedding_model, embedding, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11::vector, NOW())
-           ON CONFLICT (post_id, locale, node_path) DO UPDATE SET
-             node_type = EXCLUDED.node_type, heading = EXCLUDED.heading, content = EXCLUDED.content,
-             content_hash = EXCLUDED.content_hash, tags = EXCLUDED.tags,
-             existing_links = EXCLUDED.existing_links, embedding_model = EXCLUDED.embedding_model,
-             embedding = EXCLUDED.embedding, updated_at = NOW()`,
-          [post.id, locale, passage.nodePath, passage.nodeType, passage.heading || null, passage.content, passage.contentHash, JSON.stringify(tags), JSON.stringify(passage.existingLinks), model, vectorLiteral(vector)],
-        )
-      } else {
-        await client.query(
-          `UPDATE navi.link_passages SET node_type = $4, heading = $5, tags = $6::jsonb,
-             existing_links = $7::jsonb, updated_at = NOW()
-           WHERE post_id = $1 AND locale = $2 AND node_path = $3`,
-          [post.id, locale, passage.nodePath, passage.nodeType, passage.heading || null, JSON.stringify(tags), JSON.stringify(passage.existingLinks)],
-        )
-      }
+    const changedRows = changed.map((passage) => ({
+      nodePath: passage.nodePath, nodeType: passage.nodeType, heading: passage.heading || null,
+      content: passage.content, contentHash: passage.contentHash, tags,
+      existingLinks: passage.existingLinks, embeddingModel: model,
+      embedding: vectorLiteral(changedEmbedding.get(passage.nodePath)!),
+    }))
+    if (changedRows.length) {
+      await client.query(
+        `WITH incoming AS (
+           SELECT * FROM jsonb_to_recordset($3::jsonb) AS row(
+             "nodePath" text, "nodeType" text, heading text, content text, "contentHash" text,
+             tags jsonb, "existingLinks" jsonb, "embeddingModel" text, embedding text
+           )
+         )
+         INSERT INTO navi.link_passages
+           (post_id, locale, node_path, node_type, heading, content, content_hash, tags,
+            existing_links, embedding_model, embedding, updated_at)
+         SELECT $1, $2, "nodePath", "nodeType", heading, content, "contentHash", tags,
+                "existingLinks", "embeddingModel", embedding::vector, NOW()
+           FROM incoming
+         ON CONFLICT (post_id, locale, node_path) DO UPDATE SET
+           node_type = EXCLUDED.node_type, heading = EXCLUDED.heading, content = EXCLUDED.content,
+           content_hash = EXCLUDED.content_hash, tags = EXCLUDED.tags,
+           existing_links = EXCLUDED.existing_links, embedding_model = EXCLUDED.embedding_model,
+           embedding = EXCLUDED.embedding, updated_at = NOW()`,
+        [post.id, locale, JSON.stringify(changedRows)],
+      )
+    }
+
+    const unchangedRows = passages.filter((passage) => !changedEmbedding.has(passage.nodePath)).map((passage) => ({
+      nodePath: passage.nodePath, nodeType: passage.nodeType, heading: passage.heading || null,
+      tags, existingLinks: passage.existingLinks,
+    }))
+    if (unchangedRows.length) {
+      await client.query(
+        `WITH incoming AS (
+           SELECT * FROM jsonb_to_recordset($3::jsonb) AS row(
+             "nodePath" text, "nodeType" text, heading text, tags jsonb, "existingLinks" jsonb
+           )
+         )
+         UPDATE navi.link_passages AS passage SET
+           node_type = incoming."nodeType", heading = incoming.heading, tags = incoming.tags,
+           existing_links = incoming."existingLinks", updated_at = NOW()
+         FROM incoming
+         WHERE passage.post_id = $1 AND passage.locale = $2 AND passage.node_path = incoming."nodePath"`,
+        [post.id, locale, JSON.stringify(unchangedRows)],
+      )
     }
 
     // Existing/applied edges are reconstructed from the content. Editorially
@@ -259,23 +320,40 @@ export async function syncPostLinkIndex(payload: any, post: any, locale: Content
       "DELETE FROM navi.internal_links WHERE source_post_id = $1 AND source_locale = $2 AND state IN ('existing', 'applied')",
       [post.id, locale],
     )
-    for (const passage of passages) {
-      for (const link of passage.existingLinks) {
+    const edgeCandidates = passages.flatMap((passage) => passage.existingLinks.flatMap((link) => {
         const normalized = normalizeInternalURL(link.url)
-        if (!normalized) continue
+        if (!normalized) return []
         const route = normalized.split(/[?#]/)[0].replace(/\/+$/, '') || '/'
-        await client.query(
-          `INSERT INTO navi.internal_links
-            (source_post_id, source_locale, source_node_path, source_content_hash, target_post_id, target_url, anchor_text, state, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 'existing', NOW())
-           ON CONFLICT (source_post_id, source_locale, source_node_path, anchor_text, target_url)
-           DO UPDATE SET target_post_id = EXCLUDED.target_post_id, source_content_hash = EXCLUDED.source_content_hash,
-             state = 'existing', updated_at = NOW()`,
-          [post.id, locale, passage.nodePath, passage.contentHash, routes.get(route) || null, normalized, link.anchor],
-        )
-        linkCount += 1
-      }
+        return [{
+          sourceNodePath: passage.nodePath, sourceContentHash: passage.contentHash,
+          targetPostId: routes.get(route) || null, targetUrl: normalized, anchorText: link.anchor,
+        }]
+      }))
+    const existingEdges = [...new Map(edgeCandidates.map((edge) => [
+      `${edge.sourceNodePath}\u0000${edge.anchorText}\u0000${edge.targetUrl}`,
+      edge,
+    ])).values()]
+    if (existingEdges.length) {
+      await client.query(
+        `WITH incoming AS (
+           SELECT * FROM jsonb_to_recordset($3::jsonb) AS row(
+             "sourceNodePath" text, "sourceContentHash" text, "targetPostId" integer,
+             "targetUrl" text, "anchorText" text
+           )
+         )
+         INSERT INTO navi.internal_links
+           (source_post_id, source_locale, source_node_path, source_content_hash,
+            target_post_id, target_url, anchor_text, state, updated_at)
+         SELECT $1, $2, "sourceNodePath", "sourceContentHash", "targetPostId",
+                "targetUrl", "anchorText", 'existing', NOW()
+           FROM incoming
+         ON CONFLICT (source_post_id, source_locale, source_node_path, anchor_text, target_url)
+         DO UPDATE SET target_post_id = EXCLUDED.target_post_id,
+           source_content_hash = EXCLUDED.source_content_hash, state = 'existing', updated_at = NOW()`,
+        [post.id, locale, JSON.stringify(existingEdges)],
+      )
     }
+    linkCount = existingEdges.length
     await client.query('COMMIT')
   } catch (error) {
     await client.query('ROLLBACK')
@@ -322,6 +400,7 @@ export async function backfillLinkIndex(payload: any, options: {
   cursor?: number
   limit?: number
   locales?: ContentLocale[]
+  continueOnError?: boolean
 } = {}): Promise<{
   processed: number
   nextCursor: number | null
@@ -329,6 +408,7 @@ export async function backfillLinkIndex(payload: any, options: {
   passages: number
   embedded: number
   links: number
+  failed: number
 }> {
   const cursor = Math.max(0, Number(options.cursor || 0))
   const limit = Math.min(10, Math.max(1, Number(options.limit || 5)))
@@ -341,14 +421,22 @@ export async function backfillLinkIndex(payload: any, options: {
   let passages = 0
   let embedded = 0
   let links = 0
+  let failed = 0
   for (const base of result.docs as any[]) {
     for (const locale of locales) {
+      payload.logger.info({ postId: base.id, locale }, 'Indexing localized article passages')
       const post = await payload.findByID({ collection: 'posts-new', id: base.id, locale, fallbackLocale: false, depth: 0 }) as any
       if (!post?.content || !post?.name) continue
-      const stats = await syncPostLinkIndex(payload, post, locale)
-      passages += stats.indexed
-      embedded += stats.embedded
-      links += stats.links
+      try {
+        const stats = await syncPostLinkIndex(payload, post, locale)
+        passages += stats.indexed
+        embedded += stats.embedded
+        links += stats.links
+      } catch (error) {
+        if (!options.continueOnError) throw error
+        failed += 1
+        payload.logger.error({ err: error, postId: base.id, locale }, 'Localized article index failed; continuing backfill')
+      }
     }
   }
   const last = result.docs.at(-1) as any
@@ -359,6 +447,7 @@ export async function backfillLinkIndex(payload: any, options: {
     passages,
     embedded,
     links,
+    failed,
   }
 }
 

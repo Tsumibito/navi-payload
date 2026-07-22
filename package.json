@@ -23,6 +23,7 @@
     "migrate:seo-fields": "tsx --env-file=.env scripts/run-migration.js",
     "regenerate:images": "tsx --env-file=.env scripts/regenerate-r2-image-sizes.ts",
     "social:backfill": "tsx scripts/backfill-post-social-images.ts",
+    "links:backfill": "dotenvx run -f .env.development -- tsx scripts/backfill-internal-link-index.ts",
     "glossary:import": "dotenvx run -f .env.development -- tsx scripts/import-yachting-glossary.ts",
     "glossary:translate": "dotenvx run -f .env.development -- tsx scripts/translate-yachting-glossary.ts",
     "glossary:samples": "dotenvx run -f .env.development -- tsx scripts/generate-encyclopedia-samples.ts",
