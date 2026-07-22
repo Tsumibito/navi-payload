@@ -233,16 +233,23 @@ async function generateFAQs(content: unknown, locale: ContentLocale, glossary = 
 async function generateLinkPlan(payload: any, post: any, locale: ContentLocale) {
   const tagIds = (post.tags || []).map((tag: any) => typeof tag === 'object' ? tag.value?.id || tag.id || tag.value : tag)
   if (!tagIds.length) return []
-  const candidates = await payload.find({
-    collection: 'posts-new', locale, fallbackLocale: false, depth: 0, limit: 30,
-    where: { and: [{ id: { not_equals: post.id } }, { publicationStatus: { equals: 'published' } }, { tags: { in: tagIds } }] },
+  const tagSet = new Set(tagIds.map(String))
+  const result = await payload.find({
+    collection: 'posts-new', locale, fallbackLocale: false, depth: 0, limit: 200,
+    where: { and: [{ id: { not_equals: post.id } }, { publicationStatus: { equals: 'published' } }] },
   })
+  // `tags` is a polymorphic relationship in the legacy schema. Payload's query builder
+  // throws "Not supported" for an `in` constraint, so filter the bounded result in memory.
+  const candidateDocs = result.docs.filter((doc: any) => (doc.tags || []).some((tag: any) => {
+    const id = typeof tag === 'object' ? tag.value?.id || tag.id || tag.value : tag
+    return id != null && tagSet.has(String(id))
+  })).slice(0, 30)
   const sourceText = collectTextNodes(structuredClone(post.content)).map(({ node }) => node.text).join(' ').slice(0, 20_000)
   const response = await openRouterJSON(
     `You design useful topic-cluster internal links for a sailing school. Select 2-6 genuinely relevant links, distributed through the article rather than grouped at the end. An anchor must be an exact natural phrase already present in the article. Avoid duplicate targets and commercial over-optimization. Return JSON {"links":[{"targetId":1,"anchor":"exact text","reason":"...","sectionHint":"..."}]}.`,
-    JSON.stringify({ article: sourceText, candidates: candidates.docs.map((doc: any) => ({ id: doc.id, title: doc.name, slug: doc.publicSlug || doc.slug, summary: doc.summary })) }), editorialModel(),
+    JSON.stringify({ article: sourceText, candidates: candidateDocs.map((doc: any) => ({ id: doc.id, title: doc.name, slug: doc.publicSlug || doc.slug, summary: doc.summary })) }), editorialModel(),
   )
-  const byId = new Map(candidates.docs.map((doc: any) => [String(doc.id), doc]))
+  const byId = new Map(candidateDocs.map((doc: any) => [String(doc.id), doc]))
   const prefix = locale === 'uk' ? 'ua' : locale
   return (Array.isArray(response.links) ? response.links : []).flatMap((link: any) => {
     const target: any = byId.get(String(link.targetId))
@@ -255,15 +262,20 @@ async function generateLinkPlan(payload: any, post: any, locale: ContentLocale) 
 async function generateInboundLinkPlan(payload: any, target: any, locale: ContentLocale) {
   const tagIds = (target.tags || []).map((tag: any) => typeof tag === 'object' ? tag.value?.id || tag.id || tag.value : tag)
   if (!tagIds.length) return []
-  const candidates = await payload.find({
-    collection: 'posts-new', locale, fallbackLocale: false, depth: 0, limit: 18,
-    where: { and: [{ id: { not_equals: target.id } }, { publicationStatus: { equals: 'published' } }, { tags: { in: tagIds } }] },
+  const tagSet = new Set(tagIds.map(String))
+  const result = await payload.find({
+    collection: 'posts-new', locale, fallbackLocale: false, depth: 0, limit: 200,
+    where: { and: [{ id: { not_equals: target.id } }, { publicationStatus: { equals: 'published' } }] },
   })
+  const candidateDocs = result.docs.filter((doc: any) => (doc.tags || []).some((tag: any) => {
+    const id = typeof tag === 'object' ? tag.value?.id || tag.id || tag.value : tag
+    return id != null && tagSet.has(String(id))
+  })).slice(0, 18)
   const prefix = locale === 'uk' ? 'ua' : locale
   const targetSlug = target.publicSlug || target.slug
   if (!targetSlug) return []
   const targetURL = `/${prefix}/blog/${targetSlug}/`
-  const sources = candidates.docs.flatMap((doc: any) => {
+  const sources = candidateDocs.flatMap((doc: any) => {
     const text = lexicalPlainText(doc.content)
     if (!text || JSON.stringify(doc.content).includes(targetURL)) return []
     return [{ id: doc.id, title: doc.name, summary: doc.summary, article: text.slice(0, 7_000) }]
@@ -273,7 +285,7 @@ async function generateInboundLinkPlan(payload: any, target: any, locale: Conten
     `Select 2-5 published sailing articles that should link to the new target article. For every source choose one exact natural anchor phrase already present verbatim in that source article. The link must add genuine topical value and be distributed across the cluster. Return JSON {"links":[{"sourcePostId":1,"anchor":"exact phrase","reason":"..."}]}.`,
     JSON.stringify({ target: { title: target.name, summary: target.summary, url: targetURL }, sources }), editorialModel(),
   )
-  const byId = new Map(candidates.docs.map((doc: any) => [String(doc.id), doc]))
+  const byId = new Map(candidateDocs.map((doc: any) => [String(doc.id), doc]))
   return (Array.isArray(response.links) ? response.links : []).flatMap((link: any) => {
     const source: any = byId.get(String(link.sourcePostId))
     if (!source || typeof link.anchor !== 'string' || !lexicalPlainText(source.content).includes(link.anchor)) return []
@@ -450,9 +462,11 @@ export const localizePostTask: TaskConfig<any> = {
   ],
   handler: async ({ input, req }: any) => {
     const sourceLocale = input.sourceLocale as ContentLocale
+    let currentStage = 'loading source article'
     try {
     const source = await req.payload.findByID({ collection: 'posts-new', id: input.postId, locale: sourceLocale, fallbackLocale: false, depth: 0 }) as any
     if (!source.name || !source.content) throw new Error(`Source locale ${sourceLocale} has no title or content`)
+    currentStage = 'normalizing source Lexical content'
     source.content = normalizeLexicalRelations(source.content)
     await req.payload.update({
       collection: 'posts-new', id: input.postId, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
@@ -469,7 +483,12 @@ export const localizePostTask: TaskConfig<any> = {
     const fullRun = runSourceEditorial && runTranslations && runTaxonomyLinks && runImage
     const completed: ContentLocale[] = []
 
-    if (runTranslations && (changed.has('content') || changed.has('name'))) await learnGlossaryCandidates(req.payload, source, sourceLocale)
+    // Candidate extraction is an enrichment step for the complete workflow. A translation-only
+    // repair must not mutate the glossary or fail before it reaches the target locales.
+    if (runTranslations && runSourceEditorial && (changed.has('content') || changed.has('name'))) {
+      currentStage = 'learning glossary candidates'
+      await learnGlossaryCandidates(req.payload, source, sourceLocale)
+    }
     const selectedTagIds = runTaxonomyLinks ? await selectTags(req.payload, source, sourceLocale) : []
     if (selectedTagIds.length) {
       const selectedTags = selectedTagIds.map((value) => ({ relationTo: 'tags-new', value }))
@@ -489,6 +508,7 @@ export const localizePostTask: TaskConfig<any> = {
         data: { image: image.id, localizationWorkflow: source.localizationWorkflow },
       })
     }
+    currentStage = 'loading approved source glossary'
     const sourceGlossary = await loadApprovedGlossary(req.payload, source.content, sourceLocale, sourceLocale)
 
     const sourceEditorial = runSourceEditorial && fieldScope !== 'faq'
@@ -537,27 +557,34 @@ export const localizePostTask: TaskConfig<any> = {
     completed.push(sourceLocale)
 
     if (runTranslations) for (const target of targets) {
+      currentStage = `${target}: loading current locale`
       const current = await req.payload.findByID({ collection: 'posts-new', id: source.id, locale: target, fallbackLocale: false, depth: 0 }) as any
+      currentStage = `${target}: loading approved glossary`
       const glossary = await loadApprovedGlossary(req.payload, source.content, sourceLocale, target)
+      currentStage = `${target}: translating article content`
       const translatedContent = changed.has('content') || !current.content
         ? localizeInternalURLs(await translateLexical(source.content, sourceLocale, target, glossary), target)
         : current.content
+      currentStage = `${target}: translating title`
       const translatedTitle = changed.has('name') || !current.name
         ? await openRouterJSON(`Translate this sailing article title from ${sourceLocale} to ${target}. ${YACHTING_GLOSSARY}\n${glossary} Return JSON {"title":"..."}.`, JSON.stringify({ title: source.name }))
         : { title: current.name }
+      currentStage = `${target}: generating editorial and SEO fields`
       const editorial = await generateEditorialFields({ content: translatedContent, locale: target, name: translatedTitle.title || source.name, glossary })
       const localizedName = translatedTitle.title || editorial.title
       const localized = { ...source, id: source.id, content: translatedContent, name: localizedName, slug: current.slug || generateSlug(localizedName) }
-      const linkPlan = await generateLinkPlan(req.payload, localized, target)
-      const inboundLinkPlan = await generateInboundLinkPlan(req.payload, localized, target)
-      if (source.publicationStatus === 'published') await applyInboundLinks(req.payload, inboundLinkPlan, target)
-      const linkedContent = applyLinkPlan(translatedContent, linkPlan)
+      const linkPlan = runTaxonomyLinks ? await generateLinkPlan(req.payload, localized, target) : (current.localizationWorkflow?.linkPlan || [])
+      const inboundLinkPlan = runTaxonomyLinks ? await generateInboundLinkPlan(req.payload, localized, target) : (current.localizationWorkflow?.inboundLinkPlan || [])
+      if (runTaxonomyLinks && source.publicationStatus === 'published') await applyInboundLinks(req.payload, inboundLinkPlan, target)
+      const linkedContent = runTaxonomyLinks ? applyLinkPlan(translatedContent, linkPlan) : translatedContent
+      currentStage = `${target}: translating FAQs`
       const existingLocalizedFAQs = validFAQs(current.faqs)
       const localizedFAQs = changed.has('faqs') || !existingLocalizedFAQs.length ? await translateFAQs(sourceFAQs, sourceLocale, target, glossary) : existingLocalizedFAQs
       assertLocalizedResult({ locale: target, post: { ...localized, content: linkedContent }, editorial, faqs: localizedFAQs, linkPlan })
       const jsonLD = buildJSONLD({ ...localized, content: linkedContent, slug: generateSlug(localized.name) }, target, editorial, localizedFAQs)
       const generatedKeywords = buildGeneratedKeywords(editorial, linkedContent, localizedFAQs)
       if (generatedKeywords.keywords.length < 4) throw new Error(`${target}: fewer than four valid link keywords generated`)
+      currentStage = `${target}: saving translated article and FAQs`
       await req.payload.update({
         collection: 'posts-new', id: source.id, locale: target, context: { skipLocalizationWorkflow: true },
         data: {
@@ -571,6 +598,7 @@ export const localizePostTask: TaskConfig<any> = {
           localizationWorkflow: { ...(source.localizationWorkflow || {}), linkPlan, inboundLinkPlan },
         },
       })
+      currentStage = `${target}: saving link keywords`
       await saveGeneratedKeywords(req.payload, source.id, target, editorial.focusKeyphrase, generatedKeywords)
       completed.push(target)
     }
@@ -588,9 +616,10 @@ export const localizePostTask: TaskConfig<any> = {
     return { output: { completedLocales: completed } }
     } catch (error) {
       const failedPost = await req.payload.findByID({ collection: 'posts-new', id: input.postId, locale: sourceLocale, fallbackLocale: false, depth: 0 }).catch(() => null) as any
+      const message = error instanceof Error ? error.message : String(error)
       await req.payload.update({
         collection: 'posts-new', id: input.postId, locale: sourceLocale, context: { skipLocalizationWorkflow: true },
-        data: { localizationWorkflow: { ...(failedPost?.localizationWorkflow || {}), state: 'failed', lastError: error instanceof Error ? error.message.slice(0, 1000) : String(error).slice(0, 1000) } },
+        data: { localizationWorkflow: { ...(failedPost?.localizationWorkflow || {}), state: 'failed', lastError: `${currentStage}: ${message}`.slice(0, 1000) } },
       })
       throw error
     }
