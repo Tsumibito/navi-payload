@@ -29,7 +29,7 @@ The linking workflow indexes localized Lexical blocks rather than sending whole 
 
 For a new page, hybrid retrieval combines vector similarity, tag overlap and lexical overlap. At most 8–12 exact passages reach the editorial model. The model may only choose an anchor already present verbatim in one supplied passage. Applying a suggestion requires both the Lexical node path and its original content hash to match, so an editor's later change prevents a stale automated insertion.
 
-Embeddings use Cloudflare Workers AI and `@cf/baai/bge-m3`. Runtime configuration requires `CLOUDFLARE_AI_API_TOKEN`; the account ID is read from `CLOUDFLARE_ACCOUNT_ID` or inferred from the R2 endpoint. The authenticated `/api/internal-link-index` endpoint backfills published posts in bounded batches and reports graph/index totals.
+Embeddings use OpenRouter and `baai/bge-m3` through the existing `OPENROUTER_TOKEN`; `OPENROUTER_EMBEDDING_MODEL` can override the model without changing code. No separate Workers AI credential is required. The authenticated `/api/internal-link-index` endpoint backfills published posts in bounded batches and reports graph/index totals.
 
 ## Encyclopedia MVP
 

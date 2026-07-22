@@ -123,48 +123,39 @@ function tagIds(post: any): string[] {
   return (post.tags || []).map(relationId).filter((value: unknown) => value != null).map(String)
 }
 
-function cloudflareAccountId(): string {
-  const explicit = process.env.CLOUDFLARE_ACCOUNT_ID?.trim()
-  if (explicit) return explicit
-  const endpoint = process.env.CLOUDFLARE_R2_ENDPOINT?.trim()
-  if (endpoint) {
-    try {
-      return new URL(endpoint).hostname.split('.')[0]
-    } catch { /* handled by the error below */ }
-  }
-  throw new Error('CLOUDFLARE_ACCOUNT_ID is not configured and cannot be inferred from CLOUDFLARE_R2_ENDPOINT')
-}
-
 function embeddingModel(): string {
-  return process.env.CLOUDFLARE_EMBEDDING_MODEL?.trim() || '@cf/baai/bge-m3'
+  return process.env.OPENROUTER_EMBEDDING_MODEL?.trim() || 'baai/bge-m3'
 }
 
 function parseEmbeddingResponse(body: any): number[][] {
-  const raw = body?.result?.data || body?.result?.embeddings || body?.data
-  if (!Array.isArray(raw)) throw new Error('Cloudflare Workers AI returned no embedding matrix')
-  const matrix = raw.map((item: any) => Array.isArray(item) ? item : item?.embedding)
+  const raw = body?.data
+  if (!Array.isArray(raw)) throw new Error('OpenRouter returned no embedding matrix')
+  const ordered = [...raw].sort((left: any, right: any) => (left?.index ?? 0) - (right?.index ?? 0))
+  const matrix = ordered.map((item: any) => item?.embedding)
   if (matrix.some((item: unknown) => !Array.isArray(item) || item.length !== EMBEDDING_DIMENSIONS)) {
-    throw new Error(`Cloudflare Workers AI returned an unexpected embedding size; expected ${EMBEDDING_DIMENSIONS}`)
+    throw new Error(`OpenRouter returned an unexpected embedding size; expected ${EMBEDDING_DIMENSIONS}`)
   }
   return matrix as number[][]
 }
 
 export async function embedPassages(texts: string[]): Promise<number[][]> {
   if (!texts.length) return []
-  const token = process.env.CLOUDFLARE_AI_API_TOKEN?.trim()
-  if (!token) throw new Error('CLOUDFLARE_AI_API_TOKEN is not configured')
+  const token = process.env.OPENROUTER_TOKEN?.trim()
+  if (!token) throw new Error('OPENROUTER_TOKEN is not configured')
   const output: number[][] = []
   for (let offset = 0; offset < texts.length; offset += 24) {
     const batch = texts.slice(offset, offset + 24)
-    const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId()}/ai/v1/embeddings`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: embeddingModel(), input: batch }),
+    const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.PAYLOAD_PUBLIC_SERVER_URL?.trim() || 'https://payload.navi.training',
+        'X-Title': 'Navi.training internal linking',
       },
-    )
-    if (!response.ok) throw new Error(`Cloudflare embeddings ${response.status}: ${(await response.text()).slice(0, 500)}`)
+      body: JSON.stringify({ model: embeddingModel(), input: batch, encoding_format: 'float' }),
+    })
+    if (!response.ok) throw new Error(`OpenRouter embeddings ${response.status}: ${(await response.text()).slice(0, 500)}`)
     const body = await response.json()
     output.push(...parseEmbeddingResponse(body))
   }
