@@ -49,28 +49,45 @@ export async function POST(request: Request) {
   const payload = await getPayload({ config })
   // The generated Payload types are updated during the deployment build. Keep
   // this route deployable in the same commit that introduces the collection.
-  const leads = payload as unknown as {
+  const database = payload as unknown as {
     find: (args: Record<string, unknown>) => Promise<{ totalDocs: number }>
     create: (args: Record<string, unknown>) => Promise<unknown>
   }
 
   if (kind === 'newsletter') {
-    const existing = await leads.find({
-      collection: 'leads',
-      where: { and: [{ email: { equals: email } }, { kind: { equals: 'newsletter' } }] },
+    const existing = await database.find({
+      collection: 'subscribers',
+      where: { email: { equals: email } },
       limit: 1,
       overrideAccess: true,
     })
     if (existing.totalDocs) return Response.json({ ok: true, existing: true }, { headers })
+    await database.create({
+      collection: 'subscribers',
+      overrideAccess: true,
+      data: {
+        email,
+        status: 'subscribed',
+        firstName: clean(input.firstName, 120),
+        lastName: clean(input.lastName, 120),
+        locale: clean(input.locale, 8),
+        sourceUrl: clean(input.sourceUrl, 500),
+        utm: clean(input.utm, 1000),
+        ip: clean(request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for'), 80),
+        userAgent: clean(request.headers.get('user-agent'), 500),
+        consentAt: new Date().toISOString(),
+      },
+    })
+    return Response.json({ ok: true }, { status: 201, headers })
   }
 
-  await leads.create({
+  await database.create({
     collection: 'leads',
     overrideAccess: true,
     data: {
       email,
       kind,
-      status: kind === 'newsletter' ? 'subscribed' : 'new',
+      status: 'new',
       firstName: clean(input.firstName, 120),
       lastName: clean(input.lastName, 120),
       phone: clean(input.phone, 80),

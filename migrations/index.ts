@@ -9,6 +9,7 @@ import * as migration_20260721_190000_post_editorial_workflow from './20260721_1
 import * as migration_20260721_235500_leads from './20260721_235500_leads';
 import * as migration_20260722_112000_post_social_images from './20260722_112000_post_social_images';
 import * as migration_20260722_120000_localized_social_images from './20260722_120000_localized_social_images';
+import * as migration_20260722_130000_subscribers from './20260722_130000_subscribers';
 
 export const migrations = [
   {
@@ -65,5 +66,10 @@ export const migrations = [
     up: migration_20260722_120000_localized_social_images.up,
     down: migration_20260722_120000_localized_social_images.down,
     name: '20260722_120000_localized_social_images'
+  },
+  {
+    up: migration_20260722_130000_subscribers.up,
+    down: migration_20260722_130000_subscribers.down,
+    name: '20260722_130000_subscribers'
   },
 ];
