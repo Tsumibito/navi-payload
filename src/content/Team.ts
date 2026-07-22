@@ -3,7 +3,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 
 import { simpleEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
-import { authenticated, ssgOrAuthenticated } from '../access/authenticated';
+import { authenticated, ssgPublishedOrAuthenticated } from '../access/authenticated';
 import { createPublicSlugField } from '../fields/publicSlug';
 
 const POSTS_RELATION = 'posts-new' as unknown as CollectionSlug;
@@ -14,9 +14,11 @@ export const Team: CollectionConfig = {
     singular: 'Team Member',
     plural: 'Team',
   },
-  versions: false,
+  versions: {
+    drafts: true,
+  },
   access: {
-    read: ssgOrAuthenticated,
+    read: ssgPublishedOrAuthenticated,
     create: authenticated,
     update: authenticated,
     delete: authenticated,
