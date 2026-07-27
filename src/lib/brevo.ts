@@ -18,6 +18,14 @@ export type LeadMailData = {
   service?: string
   locale?: string
   sourceUrl?: string
+  ip?: string
+  geo?: {
+    city?: string
+    region?: string
+    country?: string
+    countryCode?: string
+    timezone?: string
+  } | null
 }
 
 const palette = {
@@ -101,7 +109,21 @@ export async function sendLeadEmails(data: LeadMailData) {
   const service = serviceCopy[serviceOf(data.service)][locale]
   const name = nameOf(data)
   const notificationEmail = process.env.LEAD_NOTIFICATION_EMAIL || 'alex.tsumibito@gmail.com'
-  const fields = [['Имя / Name', name], ['Email', data.email], ['Телефон / Phone', data.phone], ['Услуга / Service', service.label], ['Язык / Language', locale], ['Сообщение / Message', data.message], ['Источник / Source', data.sourceUrl]].filter(([, value]) => value)
+  const location = data.geo
+    ? [data.geo.city, data.geo.region, data.geo.countryCode || data.geo.country].filter(Boolean).join(', ')
+    : ''
+  const fields = [
+    ['Имя / Name', name],
+    ['Email', data.email],
+    ['Телефон / Phone', data.phone],
+    ['Услуга / Service', service.label],
+    ['Язык / Language', locale],
+    ['Сообщение / Message', data.message],
+    ['Источник / Source', data.sourceUrl],
+    ['IP', data.ip],
+    ['Геолокация / Location', location],
+    ['Часовой пояс / Timezone', data.geo?.timezone],
+  ].filter(([, value]) => value)
   const rows = fields.map(([label, value]) => `<tr><td style="padding:8px 16px 8px 0;color:${palette.muted};vertical-align:top;font-size:13px">${escapeHtml(label)}</td><td style="padding:8px 0;color:${palette.sea};white-space:pre-wrap">${escapeHtml(value)}</td></tr>`).join('')
   const customerUrl = `https://navi.training/${siteLocale(locale)}/${service.path ? `${service.path}/` : ''}`
 

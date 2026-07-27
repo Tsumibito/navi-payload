@@ -1,6 +1,7 @@
 import config from '@payload-config'
 import { getPayload } from 'payload'
 import { sendLeadEmails, sendSubscriberEmails, syncBrevoSubscriber } from '@/lib/brevo'
+import { lookupGeoIp } from '@/lib/geoip'
 
 const allowedOrigins = [
   /^https:\/\/(?:www\.)?navi\.training$/,
@@ -17,6 +18,14 @@ function cors(origin: string | null) {
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   }
+}
+
+function requestIp(request: Request) {
+  return String(
+    request.headers.get('cf-connecting-ip')
+      || request.headers.get('x-forwarded-for')?.split(',')[0]
+      || '',
+  ).trim().slice(0, 80)
 }
 
 export async function OPTIONS(request: Request) {
@@ -47,6 +56,7 @@ export async function POST(request: Request) {
   }
 
   const clean = (value: unknown, max: number) => String(value || '').trim().slice(0, max)
+  const ip = requestIp(request)
   const payload = await getPayload({ config })
   // The generated Payload types are updated during the deployment build. Keep
   // this route deployable in the same commit that introduces the collection.
@@ -85,7 +95,7 @@ export async function POST(request: Request) {
         locale: clean(input.locale, 8),
         sourceUrl: clean(input.sourceUrl, 500),
         utm: clean(input.utm, 1000),
-        ip: clean(request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for'), 80),
+        ip,
         userAgent: clean(request.headers.get('user-agent'), 500),
         consentAt: new Date().toISOString(),
       },
@@ -104,6 +114,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: true }, { status: 201, headers })
   }
 
+  const geoPromise = lookupGeoIp(ip)
   await database.create({
     collection: 'leads',
     overrideAccess: true,
@@ -119,13 +130,14 @@ export async function POST(request: Request) {
       locale: clean(input.locale, 8),
       sourceUrl: clean(input.sourceUrl, 500),
       utm: clean(input.utm, 1000),
-      ip: clean(request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for'), 80),
+      ip,
       userAgent: clean(request.headers.get('user-agent'), 500),
       consentAt: new Date().toISOString(),
     },
   })
 
   try {
+    const geo = await geoPromise
     await sendLeadEmails({
       email,
       firstName: clean(input.firstName, 120),
@@ -135,6 +147,8 @@ export async function POST(request: Request) {
       service: clean(input.service, 160),
       locale: clean(input.locale, 8),
       sourceUrl: clean(input.sourceUrl, 500),
+      ip,
+      geo,
     })
   } catch (error) {
     console.error('Lead email delivery failed', error instanceof Error ? error.message : 'unknown error')
