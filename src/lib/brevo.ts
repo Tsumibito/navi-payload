@@ -108,7 +108,7 @@ export async function sendLeadEmails(data: LeadMailData) {
   const locale = localeOf(data.locale)
   const service = serviceCopy[serviceOf(data.service)][locale]
   const name = nameOf(data)
-  const notificationEmail = process.env.LEAD_NOTIFICATION_EMAIL || 'alex.tsumibito@gmail.com'
+  const notificationEmail = process.env.LEAD_NOTIFICATION_EMAIL || 'alex@navi.training'
   const location = data.geo
     ? [data.geo.city, data.geo.region, data.geo.countryCode || data.geo.country].filter(Boolean).join(', ')
     : ''
