@@ -100,7 +100,7 @@ export async function sendLeadEmails(data: LeadMailData) {
   const locale = localeOf(data.locale)
   const service = serviceCopy[serviceOf(data.service)][locale]
   const name = nameOf(data)
-  const notificationEmail = process.env.LEAD_NOTIFICATION_EMAIL || 'alex@navi.training'
+  const notificationEmail = process.env.LEAD_NOTIFICATION_EMAIL || 'alex.tsumibito@gmail.com'
   const fields = [['Имя / Name', name], ['Email', data.email], ['Телефон / Phone', data.phone], ['Услуга / Service', service.label], ['Язык / Language', locale], ['Сообщение / Message', data.message], ['Источник / Source', data.sourceUrl]].filter(([, value]) => value)
   const rows = fields.map(([label, value]) => `<tr><td style="padding:8px 16px 8px 0;color:${palette.muted};vertical-align:top;font-size:13px">${escapeHtml(label)}</td><td style="padding:8px 0;color:${palette.sea};white-space:pre-wrap">${escapeHtml(value)}</td></tr>`).join('')
   const customerUrl = `https://navi.training/${siteLocale(locale)}/${service.path ? `${service.path}/` : ''}`
@@ -128,16 +128,10 @@ export async function sendSubscriberEmails(data: Pick<LeadMailData, 'email' | 'f
     uk: { subject: 'Ви підписані на новини Navi.training', title: 'Ласкаво просимо на борт', body: 'Ви підписані на новини для тих, кого кличе море. Надсилатимемо нові маршрути, історії та корисні матеріали без зайвого шуму.', action: 'Читати журнал' },
     en: { subject: 'You are subscribed to Navi.training news', title: 'Welcome aboard', body: 'You are subscribed to news for people drawn to the sea. Expect new routes, stories and useful guidance without the noise.', action: 'Read the journal' },
   }[locale]
-  const notificationEmail = process.env.LEAD_NOTIFICATION_EMAIL || 'alex@navi.training'
   const blogUrl = `https://navi.training/${siteLocale(locale)}/blog/`
 
   await Promise.all([
     syncBrevoSubscriber(data),
-    send({
-      to: [{ email: notificationEmail, name: 'Alex' }], subject: `[Подписка] ${name || data.email}`,
-      htmlContent: emailShell({ title: 'Новый подписчик', eyebrow: 'Бортовой журнал', preheader: `Новая подписка: ${data.email}`, content: `<p style="margin:0"><strong>${escapeHtml(name || data.email)}</strong><br><a href="mailto:${escapeHtml(data.email)}" style="color:${palette.orange}">${escapeHtml(data.email)}</a></p><p style="margin:18px 0 0;color:${palette.muted};font-size:13px">Источник: ${escapeHtml(data.sourceUrl)}</p>` }),
-      textContent: `Новый подписчик\n\n${name || '-'}\n${data.email}\n${data.sourceUrl || '-'}`,
-    }),
     send({
       to: [{ email: data.email, name: name || undefined }], subject: customer.subject,
       htmlContent: emailShell({ title: customer.title, eyebrow: 'Navi.training journal', preheader: customer.body, content: `<p style="margin:0">${escapeHtml(customer.body)}</p>`, action: { href: blogUrl, label: customer.action } }),
