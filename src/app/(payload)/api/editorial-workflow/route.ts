@@ -43,7 +43,7 @@ function lexicalLinks(value: unknown): Array<{ anchor: string; url: string }> {
     }
     if (Array.isArray(node.children)) node.children.forEach(visit)
   }
-  visit(value)
+  visit((value as any)?.root || value)
   return links
 }
 
@@ -84,7 +84,7 @@ async function publicationReadiness(payload: any, postId: number | string) {
         if (typeof node?.text === 'string') words.push(...node.text.trim().split(/\s+/).filter(Boolean))
         if (Array.isArray(node?.children)) node.children.forEach(visit)
       }
-      visit(post.content)
+      visit(post.content?.root)
       return words.length
     })()
     const expectedLinks = wordCount >= 2_500 ? 8 : wordCount >= 1_500 ? 7 : wordCount >= 800 ? 5 : 4
