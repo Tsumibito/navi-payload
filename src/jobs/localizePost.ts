@@ -261,7 +261,10 @@ async function generateLinkPlan(payload: any, post: any, locale: ContentLocale) 
     } catch { return [] }
   })))
   const wordCount = lexicalPlainText(post.content).split(/\s+/).filter(Boolean).length
-  const minimumTotal = 4
+  // Match the corpus instead of accepting a token handful of links: published
+  // Navi articles currently have a 7-8 link median. Long-form guides should
+  // therefore land in the same topic-cluster density without exceeding 12.
+  const minimumTotal = wordCount >= 2_500 ? 8 : wordCount >= 1_500 ? 7 : wordCount >= 800 ? 5 : 4
   const maximumTotal = wordCount >= 2_500 ? 12 : wordCount >= 1_500 ? 9 : wordCount >= 800 ? 7 : 5
   const minimumNew = Math.max(0, minimumTotal - existingInternalLinks.size)
   const maximumNew = Math.max(0, maximumTotal - existingInternalLinks.size)
@@ -278,7 +281,7 @@ async function generateLinkPlan(payload: any, post: any, locale: ContentLocale) 
     relevantPassage: passage.content, score: Number(passage.hybridScore.toFixed(4)),
   }])).values()].slice(0, Math.min(16, maximumNew + 6))
   const response = await openRouterLinkJSON(
-    `You design useful topic-cluster internal links for a sailing school. The article already has ${existingInternalLinks.size} internal links. Select ${minimumNew}-${maximumNew} additional links when that many genuinely useful matches exist, so the finished long-form article contains 4-12 internal links according to its length. Use no more than one link per source passage and one per target. The anchor must be an exact, case-sensitive natural phrase already present verbatim in that source passage, 2-7 words, descriptive without keyword stuffing. Do not place a link in a passage that already contains one. Return JSON {"links":[{"targetId":1,"sourceNodePath":"0.2","anchor":"exact text","reason":"reader benefit"}]}.`,
+    `You design useful topic-cluster internal links for a sailing school. The article already has ${existingInternalLinks.size} internal links. Select ${minimumNew}-${maximumNew} additional links when that many genuinely useful matches exist, so the finished article contains ${minimumTotal}-${maximumTotal} internal links according to its length and matches the site's 7-8 link median. Use no more than one link per source passage and one per target. The anchor must be an exact, case-sensitive natural phrase already present verbatim in that source passage, 2-7 words, descriptive without keyword stuffing. Do not place a link in a passage that already contains one. Return JSON {"links":[{"targetId":1,"sourceNodePath":"0.2","anchor":"exact text","reason":"reader benefit"}]}.`,
     JSON.stringify({ desired: { minimumNew, maximumNew, minimumTotal, maximumTotal }, sourcePassages: sourcePassages.map((passage) => ({ nodePath: passage.nodePath, heading: passage.heading, text: passage.content.slice(0, 1_200) })), targets }),
   )
   const byId = new Map(targets.map((target) => [String(target.id), target]))

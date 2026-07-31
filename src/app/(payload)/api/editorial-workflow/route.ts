@@ -78,9 +78,25 @@ async function publicationReadiness(payload: any, postId: number | string) {
     const keywords = secondaryKeywords(post.seo)
     const linkedKeywords = keywords.filter((keyword) => internalLinks.some(({ anchor }) => anchor.toLocaleLowerCase(locale).includes(keyword.toLocaleLowerCase(locale))))
     locales[locale] = { internalLinks: internalLinks.length, keywords: keywords.length, linkedKeywords: linkedKeywords.length }
-    if (internalLinks.length < 2) warnings.push(`${locale}: only ${internalLinks.length} internal links`)
+    const wordCount = (() => {
+      const words: string[] = []
+      const visit = (node: any) => {
+        if (typeof node?.text === 'string') words.push(...node.text.trim().split(/\s+/).filter(Boolean))
+        if (Array.isArray(node?.children)) node.children.forEach(visit)
+      }
+      visit(post.content)
+      return words.length
+    })()
+    const expectedLinks = wordCount >= 2_500 ? 8 : wordCount >= 1_500 ? 7 : wordCount >= 800 ? 5 : 4
+    if (internalLinks.length < expectedLinks) warnings.push(`${locale}: only ${internalLinks.length}/${expectedLinks} recommended internal links`)
     if (!keywords.length) errors.push(`${locale}: secondary link keywords missing`)
-    else if (linkedKeywords.length < keywords.length) warnings.push(`${locale}: ${keywords.length - linkedKeywords.length}/${keywords.length} secondary keywords are not used in link anchors`)
+    else {
+      // Requiring every secondary phrase as an anchor produces visible SEO
+      // stuffing. Two contextual keyword anchors are enough; remaining links
+      // should use varied, reader-first language.
+      const expectedKeywordAnchors = Math.min(2, keywords.length)
+      if (linkedKeywords.length < expectedKeywordAnchors) warnings.push(`${locale}: only ${linkedKeywords.length}/${expectedKeywordAnchors} recommended secondary-keyword anchors`)
+    }
   }
   const base = await payload.findByID({ collection: 'posts-new', id: postId, locale: 'uk', fallbackLocale: false, depth: 0 }) as any
   if (!base.image) errors.push('Hero image missing')
