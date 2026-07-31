@@ -50,8 +50,9 @@ export async function POST(request: Request) {
   if (String(input.company || '').trim()) return Response.json({ ok: true }, { headers })
 
   const email = String(input.email || '').trim().toLowerCase()
+  const submissionId = String(input.submissionId || '').trim().slice(0, 100)
   const kind = input.kind === 'newsletter' ? 'newsletter' : ['contact', 'service'].includes(String(input.kind)) ? 'contact' : null
-  if (!kind || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || input.consent !== true) {
+  if (!kind || !/^[a-zA-Z0-9_-]{16,100}$/.test(submissionId) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || input.consent !== true) {
     return Response.json({ ok: false, error: 'invalid_fields' }, { status: 422, headers })
   }
 
@@ -88,6 +89,7 @@ export async function POST(request: Request) {
       collection: 'subscribers',
       overrideAccess: true,
       data: {
+        submissionId,
         email,
         status: 'subscribed',
         firstName: clean(input.firstName, 120),
@@ -115,10 +117,18 @@ export async function POST(request: Request) {
   }
 
   const geoPromise = lookupGeoIp(ip)
+  const existingLead = await database.find({
+    collection: 'leads',
+    where: { submissionId: { equals: submissionId } },
+    limit: 1,
+    overrideAccess: true,
+  })
+  if (existingLead.totalDocs) return Response.json({ ok: true, existing: true }, { headers })
   await database.create({
     collection: 'leads',
     overrideAccess: true,
     data: {
+      submissionId,
       email,
       kind,
       status: 'new',

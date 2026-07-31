@@ -16,6 +16,7 @@ export const Leads: CollectionConfig = {
     delete: authenticated,
   },
   fields: [
+    { name: 'submissionId', type: 'text', required: true, unique: true, index: true, admin: { readOnly: true } },
     { name: 'email', type: 'email', required: true, index: true },
     {
       name: 'kind',
