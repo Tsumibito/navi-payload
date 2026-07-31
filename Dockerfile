@@ -32,7 +32,9 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 RUN apt-get update && \
-  apt-get install --yes --no-install-recommends tini && \
+  # Coolify's external Dockerfile health probe requires curl or wget even
+  # though the image also declares its own Node-based HEALTHCHECK.
+  apt-get install --yes --no-install-recommends curl tini && \
   rm -rf /var/lib/apt/lists/* && \
   npm install --global @dotenvx/dotenvx@2.15.1 --no-audit --no-fund && \
   npm cache clean --force && \
