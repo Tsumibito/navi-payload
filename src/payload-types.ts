@@ -156,8 +156,12 @@ export interface UserAuthOperations {
  */
 export interface User {
   id: number;
+  role: 'admin' | 'editor' | 'automation';
   updatedAt: string;
   createdAt: string;
+  enableAPIKey?: boolean | null;
+  apiKey?: string | null;
+  apiKeyIndex?: string | null;
   email: string;
   resetPasswordToken?: string | null;
   resetPasswordExpiration?: string | null;
@@ -346,7 +350,7 @@ export interface PostsNew {
    */
   publicSlug?: string | null;
   /**
-   * Publishing is separate from saving. AI jobs never publish automatically.
+   * Global for the whole article (RU / UK / EN). Publishing is separate from saving.
    */
   publicationStatus: 'draft' | 'localizing' | 'review' | 'ready' | 'published';
   localizationWorkflow: {
@@ -1373,8 +1377,12 @@ export interface PayloadMigration {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  role?: T;
   updatedAt?: T;
   createdAt?: T;
+  enableAPIKey?: T;
+  apiKey?: T;
+  apiKeyIndex?: T;
   email?: T;
   resetPasswordToken?: T;
   resetPasswordExpiration?: T;

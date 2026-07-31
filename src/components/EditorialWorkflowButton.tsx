@@ -3,12 +3,14 @@
 import { Button, useDocumentInfo } from '@payloadcms/ui'
 import React, { useCallback, useEffect, useState } from 'react'
 
-type Action = 'editorial' | 'translations' | 'taxonomy' | 'image' | 'social' | 'full' | 'publish'
+type Action = 'editorial' | 'translations' | 'taxonomy' | 'image' | 'social' | 'full' | 'publish' | 'deploy'
 type Status = {
   publicationStatus?: string
   workflow?: { state?: string; currentStage?: string; completedLocales?: string[]; lastError?: string }
   assets?: { hero?: boolean; social?: Record<string, boolean> }
   errors?: string[]
+  warnings?: string[]
+  locales?: Record<string, { internalLinks: number; keywords: number; linkedKeywords: number }>
 }
 const actions: Array<{ action: Action; eyebrow: string; title: string; text: string; asset?: 'hero' | 'social' }> = [
   { action: 'editorial', eyebrow: 'Current language', title: 'Generate editorial fields', text: 'Summary, SEO title, description, keyphrase, JSON-LD, FAQ and image alt.' },
@@ -53,13 +55,14 @@ export function EditorialWorkflowButton() {
   const run = async (action: Action) => {
     if (!id || active) return
     if (action === 'publish' && !window.confirm('Опубликовать статью и открыть её для SSG?')) return
+    if (action === 'deploy' && !window.confirm('Запустить новую сборку публичного сайта в Cloudflare Pages?')) return
     setActive(action); setError(''); setMessage('Запускаю действие для последней сохранённой версии…')
     try {
-      setMessage(action === 'publish' ? 'Проверяю готовность…' : 'Ставлю задачу в очередь…')
+      setMessage(action === 'publish' ? 'Проверяю готовность…' : action === 'deploy' ? 'Запускаю сборку Cloudflare Pages…' : 'Ставлю задачу в очередь…')
       const response = await fetch('/api/editorial-workflow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postId: id, action, locale: currentLocale }) })
       const body = await response.json()
       if (!response.ok) throw new Error([body.error, ...(body.errors || [])].filter(Boolean).join(' · '))
-      setMessage(body.completed ? 'Поля записаны. Обновляю форму…' : action === 'publish' ? 'Статья опубликована.' : 'Задача запущена. Результат появится после обработки.')
+      setMessage(body.completed ? 'Поля записаны. Обновляю форму…' : action === 'publish' ? 'Статья опубликована.' : action === 'deploy' ? 'Сборка Cloudflare Pages запущена.' : 'Задача запущена. Результат появится после обработки.')
       if (body.completed) { window.location.reload(); return }
       await refresh()
     } catch (reason) {
@@ -90,8 +93,8 @@ export function EditorialWorkflowButton() {
         </div>})}
       </div>
       <footer style={{ padding: 18, display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', background: 'var(--theme-elevation-50)' }}>
-        <div><strong>{message || 'Ready for the next editorial action.'}</strong>{['queued', 'running'].includes(workflowState) && <div style={{ marginTop: 7, fontSize: 12, color: 'var(--theme-elevation-600)' }}>Live status refreshes automatically every 3 seconds.</div>}{status.workflow?.completedLocales?.length ? <div style={{ marginTop: 7, fontSize: 12, color: 'var(--theme-elevation-600)' }}>Completed languages: {status.workflow.completedLocales.map((locale) => locale.toUpperCase()).join(' · ')}</div> : null}{error && <div style={{ color: 'var(--theme-error-500)', marginTop: 5 }}>{error}</div>}{status.workflow?.lastError && <div style={{ color: 'var(--theme-error-500)', marginTop: 5 }}>Last workflow error: {status.workflow.lastError}</div>}</div>
-        <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}><Button type="button" disabled={workflowBusy} onClick={() => run('full')}>{active === 'full' ? 'Preparing…' : 'Prepare everything'}</Button><Button type="button" buttonStyle="secondary" disabled={workflowBusy || publication !== 'ready'} onClick={() => run('publish')}>Publish</Button></div>
+        <div><strong>{message || 'Ready for the next editorial action.'}</strong>{status.warnings?.map((warning) => <div key={warning} style={{ marginTop: 5, fontSize: 12, color: '#a16207' }}>⚠ {warning}</div>)}{['queued', 'running'].includes(workflowState) && <div style={{ marginTop: 7, fontSize: 12, color: 'var(--theme-elevation-600)' }}>Live status refreshes automatically every 3 seconds.</div>}{status.workflow?.completedLocales?.length ? <div style={{ marginTop: 7, fontSize: 12, color: 'var(--theme-elevation-600)' }}>Completed languages: {status.workflow.completedLocales.map((locale) => locale.toUpperCase()).join(' · ')}</div> : null}{error && <div style={{ color: 'var(--theme-error-500)', marginTop: 5 }}>{error}</div>}{status.workflow?.lastError && <div style={{ color: 'var(--theme-error-500)', marginTop: 5 }}>Last workflow error: {status.workflow.lastError}</div>}</div>
+        <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}><Button type="button" disabled={workflowBusy} onClick={() => run('full')}>{active === 'full' ? 'Preparing…' : 'Prepare everything'}</Button><Button type="button" buttonStyle="secondary" disabled={workflowBusy || publication !== 'ready'} onClick={() => run('publish')}>Publish</Button><Button type="button" buttonStyle="secondary" disabled={workflowBusy || publication !== 'published'} onClick={() => run('deploy')}>{active === 'deploy' ? 'Starting build…' : 'Redeploy site'}</Button></div>
       </footer>
     </section>
   )

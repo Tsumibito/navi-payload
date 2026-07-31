@@ -3,7 +3,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 
 import { contentEditorFeatures, simpleEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
-import { authenticated, ssgOrAuthenticated } from '../access/authenticated';
+import { adminOnly, contentEditor, ssgOrAuthenticated } from '../access/authenticated';
 import { createPublicSlugField } from '../fields/publicSlug';
 import { CONTENT_LOCALES } from '../config/contentLocales';
 
@@ -25,9 +25,9 @@ export const Posts: CollectionConfig = {
   },
   access: {
     read: ssgOrAuthenticated,
-    create: authenticated,
-    update: authenticated,
-    delete: authenticated,
+    create: contentEditor,
+    update: contentEditor,
+    delete: adminOnly,
   },
   hooks: {
     beforeChange: [
@@ -55,7 +55,9 @@ export const Posts: CollectionConfig = {
         const targetLocales = doc.localizationWorkflow.targetLocales?.length
           ? doc.localizationWorkflow.targetLocales
           : CONTENT_LOCALES.map(({ code }) => code);
-        const watchedFields = ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags', 'publicationStatus'] as const;
+        // publicationStatus is deliberately global. It must never enter the
+        // locale propagation pipeline or appear to change per language.
+        const watchedFields = ['name', 'content', 'summary', 'image', 'faqs', 'authors', 'tags'] as const;
         const imageRequested = Boolean(doc.localizationWorkflow?.imagePrompt) && (
           !doc.image || doc.localizationWorkflow?.regenerateImage ||
           doc.localizationWorkflow?.imagePrompt !== previousDoc?.localizationWorkflow?.imagePrompt
@@ -125,7 +127,7 @@ export const Posts: CollectionConfig = {
         { label: 'Ready to publish', value: 'ready' },
         { label: 'Published', value: 'published' },
       ],
-      admin: { position: 'sidebar', description: 'Publishing is separate from saving. AI jobs never publish automatically.' },
+      admin: { position: 'sidebar', description: 'Global for the whole article (RU / UK / EN). Publishing is separate from saving.' },
     },
     {
       type: 'tabs',

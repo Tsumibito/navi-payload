@@ -4,7 +4,7 @@ import { authenticatePayloadRequest, unauthorizedResponse } from '@/utils/authen
 import { localizePostTask, normalizeLexicalRelations } from '@/jobs/localizePost'
 
 const DEFAULT_IMAGE_PROMPT = 'Photorealistic editorial hero image for a professional sailing article. Accurate modern yacht equipment and realistic seamanship context, natural light, clean 16:9 composition, no logos, brands, watermarks or readable interface text.'
-type Action = 'editorial' | 'seo' | 'faq' | 'alt' | 'translations' | 'taxonomy' | 'image' | 'social' | 'full' | 'publish'
+type Action = 'editorial' | 'seo' | 'faq' | 'alt' | 'translations' | 'taxonomy' | 'image' | 'social' | 'full' | 'publish' | 'deploy'
 const ACTION_STAGES: Record<'editorial' | 'translations' | 'taxonomy' | 'image' | 'social' | 'full', string[]> = {
   editorial: ['source-editorial'], translations: ['translations'], taxonomy: ['taxonomy-links'], image: ['image'],
   social: ['social-images'],
@@ -29,8 +29,36 @@ function validFAQs(value: unknown): any[] {
   return value.filter((faq) => typeof faq?.question === 'string' && faq.question.trim() && hasRichText(faq.answer))
 }
 
+function lexicalLinks(value: unknown): Array<{ anchor: string; url: string }> {
+  const links: Array<{ anchor: string; url: string }> = []
+  const text = (node: any): string => typeof node?.text === 'string'
+    ? node.text
+    : Array.isArray(node?.children) ? node.children.map(text).join('') : ''
+  const visit = (node: any) => {
+    if (!node || typeof node !== 'object') return
+    if (node.type === 'link' || node.type === 'autolink') {
+      const url = node.fields?.url || node.url
+      const anchor = text(node).replace(/\s+/g, ' ').trim()
+      if (anchor && typeof url === 'string') links.push({ anchor, url })
+    }
+    if (Array.isArray(node.children)) node.children.forEach(visit)
+  }
+  visit(value)
+  return links
+}
+
+function secondaryKeywords(seo: any): string[] {
+  const structured = Array.isArray(seo?.additional_fields?.keywords)
+    ? seo.additional_fields.keywords.map((item: any) => item?.keyword)
+    : []
+  const legacy = typeof seo?.link_keywords === 'string' ? seo.link_keywords.split(',') : []
+  return [...new Set([...structured, ...legacy].map((item) => String(item || '').trim()).filter(Boolean))]
+}
+
 async function publicationReadiness(payload: any, postId: number | string) {
   const errors: string[] = []
+  const warnings: string[] = []
+  const locales: Record<string, { internalLinks: number; keywords: number; linkedKeywords: number }> = {}
   const social: Record<string, boolean> = {}
   let hero = false
   for (const locale of ['uk', 'ru', 'en']) {
@@ -38,15 +66,27 @@ async function publicationReadiness(payload: any, postId: number | string) {
     hero ||= Boolean(post.image)
     social[locale] = Boolean(post.socialImages?.thumbnail && post.socialImages?.image16x9 && post.socialImages?.image5x4)
     if (!post.name || !post.content || !post.summary) errors.push(`${locale}: title, content or summary missing`)
+    if (!post.slug) errors.push(`${locale}: slug missing`)
+    if (!post.imageAlt) errors.push(`${locale}: image alt missing`)
     if (!post.seo?.title || !post.seo?.meta_description || !post.seo?.json_ld) errors.push(`${locale}: SEO or JSON-LD missing`)
+    if (!post.seo?.focus_keyphrase) errors.push(`${locale}: focus keyphrase missing`)
+    if (post.seo?.no_index) errors.push(`${locale}: no_index is enabled`)
     if (validFAQs(post.faqs).length < 4) errors.push(`${locale}: fewer than 4 valid FAQs`)
     if (!social[locale]) errors.push(`${locale}: social images missing`)
+    const links = lexicalLinks(post.content)
+    const internalLinks = links.filter(({ url }) => /^\/(ru|ua|en)\//.test(url) || /^(https?:\/\/)?(www\.)?navi\.training\//i.test(url))
+    const keywords = secondaryKeywords(post.seo)
+    const linkedKeywords = keywords.filter((keyword) => internalLinks.some(({ anchor }) => anchor.toLocaleLowerCase(locale).includes(keyword.toLocaleLowerCase(locale))))
+    locales[locale] = { internalLinks: internalLinks.length, keywords: keywords.length, linkedKeywords: linkedKeywords.length }
+    if (internalLinks.length < 2) warnings.push(`${locale}: only ${internalLinks.length} internal links`)
+    if (!keywords.length) errors.push(`${locale}: secondary link keywords missing`)
+    else if (linkedKeywords.length < keywords.length) warnings.push(`${locale}: ${keywords.length - linkedKeywords.length}/${keywords.length} secondary keywords are not used in link anchors`)
   }
   const base = await payload.findByID({ collection: 'posts-new', id: postId, locale: 'uk', fallbackLocale: false, depth: 0 }) as any
   if (!base.image) errors.push('Hero image missing')
   if (!(base.tags || []).length) errors.push('Tags missing')
   if (!(base.authors || []).length) errors.push('Author missing')
-  return { errors, assets: { hero, social } }
+  return { errors, warnings, locales, assets: { hero, social } }
 }
 
 export async function GET(request: Request) {
@@ -68,9 +108,18 @@ export async function POST(request: Request) {
   try {
     const { postId, action = 'full', locale: requestedLocale } = await request.json() as { postId?: number | string; action?: Action; locale?: string }
     if (!postId) return NextResponse.json({ error: 'postId is required' }, { status: 400 })
-    if (!['editorial', 'seo', 'faq', 'alt', 'translations', 'taxonomy', 'image', 'social', 'full', 'publish'].includes(action)) return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
+    if (!['editorial', 'seo', 'faq', 'alt', 'translations', 'taxonomy', 'image', 'social', 'full', 'publish', 'deploy'].includes(action)) return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
     const { payload } = auth
     const post = await payload.findByID({ collection: 'posts-new', id: postId, locale: 'uk', fallbackLocale: false, depth: 0 }) as any
+
+    if (action === 'deploy') {
+      if (post.publicationStatus !== 'published') return NextResponse.json({ error: 'Сначала опубликуйте статью' }, { status: 409 })
+      const hook = process.env.CLOUDFLARE_PAGES_DEPLOY_HOOK?.trim()
+      if (!hook) return NextResponse.json({ error: 'CLOUDFLARE_PAGES_DEPLOY_HOOK is not configured' }, { status: 503 })
+      const response = await fetch(hook, { method: 'POST', body: '' })
+      if (!response.ok) return NextResponse.json({ error: `Cloudflare deploy hook failed (${response.status})` }, { status: 502 })
+      return NextResponse.json({ deployed: true, postId, cloudflare: await response.json().catch(() => null) })
+    }
 
     const normalizedRequestedLocale = requestedLocale === 'ua' ? 'uk' : requestedLocale
     // Article 27 was authored in Russian. Older workflow code incorrectly marked it as Ukrainian.
@@ -84,9 +133,7 @@ export async function POST(request: Request) {
     if (action === 'publish') {
       const { errors } = await publicationReadiness(payload, postId)
       if (errors.length) return NextResponse.json({ error: 'Статья не готова к публикации', errors }, { status: 409 })
-      await payload.update({ collection: 'posts-new', id: postId, locale: sourceLocale, context: { skipLocalizationWorkflow: true }, data: { publicationStatus: 'published' } })
-      await payload.jobs.queue({ task: 'localize-post' as never, queue: 'content-localization', input: { postId: Number(postId), sourceLocale, targetLocales: ['uk', 'ru', 'en'], changedFields: ['publicationStatus'], stages: ['taxonomy-links'] } as never })
-      void payload.jobs.run({ queue: 'content-localization', limit: 1 }).catch((error) => payload.logger.error({ err: error }, 'Publication link worker failed'))
+      await payload.update({ collection: 'posts-new', id: postId, locale: 'uk', context: { skipLocalizationWorkflow: true }, data: { publicationStatus: 'published' } })
       return NextResponse.json({ published: true, postId })
     }
     const workflow = {

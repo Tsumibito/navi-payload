@@ -1,6 +1,11 @@
 # syntax=docker/dockerfile:1
 
-FROM node:20-alpine AS builder
+ARG NODE_VERSION=24.17.0
+
+# Debian/glibc is intentional. Payload's image pipeline depends on sharp and
+# the former Node 22 failure was most likely in the Alpine/musl native-module
+# path, not in Payload's declared Node engine range.
+FROM node:${NODE_VERSION}-bookworm-slim AS builder
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -18,7 +23,7 @@ ENV NODE_ENV=production
 ENV PAYLOAD_BUILD=1
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:${NODE_VERSION}-bookworm-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -26,8 +31,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-RUN apk add --no-cache libc6-compat curl && \
+RUN apt-get update && \
+  apt-get install --yes --no-install-recommends tini && \
+  rm -rf /var/lib/apt/lists/* && \
   npm install --global @dotenvx/dotenvx@2.15.1 --no-audit --no-fund && \
+  npm cache clean --force && \
   addgroup --system --gid 1001 nodejs && \
   adduser --system --uid 1001 nextjs
 
@@ -41,12 +49,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/.env.production ./.env.production
 USER nextjs
 
 EXPOSE 3000
+STOPSIGNAL SIGTERM
 
 # Static endpoint: verifies the app without opening a database connection.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD curl -fsS http://127.0.0.1:3000/api/health || exit 1
+  CMD ["node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
 
 # Keep decryption in ENTRYPOINT so platform-level command overrides (Coolify,
 # Compose, Kubernetes) cannot accidentally bypass production env loading.
-ENTRYPOINT ["dotenvx", "run", "-f", ".env.production", "--"]
+ENTRYPOINT ["tini", "--", "dotenvx", "run", "-f", ".env.production", "--"]
 CMD ["node", "server.js"]

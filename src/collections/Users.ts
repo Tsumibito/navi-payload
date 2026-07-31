@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { authenticated } from '../access/authenticated'
+import { adminOnly } from '../access/authenticated'
 
 export const Users: CollectionConfig = {
   slug: 'users',
@@ -9,15 +9,26 @@ export const Users: CollectionConfig = {
   },
   auth: {
     tokenExpiration: 7 * 24 * 60 * 60,
+    useAPIKey: true,
   },
   access: {
-    read: authenticated,
-    create: authenticated,
-    update: authenticated,
-    delete: authenticated,
+    read: adminOnly,
+    create: adminOnly,
+    update: adminOnly,
+    delete: adminOnly,
   },
   fields: [
-    // Email added by default
-    // Add more fields as needed
+    {
+      name: 'role',
+      type: 'select',
+      required: true,
+      defaultValue: 'admin',
+      saveToJWT: true,
+      options: [
+        { label: 'Administrator', value: 'admin' },
+        { label: 'Editor', value: 'editor' },
+        { label: 'Automation', value: 'automation' },
+      ],
+    },
   ],
 }

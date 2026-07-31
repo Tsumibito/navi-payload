@@ -51,7 +51,10 @@ export const env = {
     // Do not retain a floor of idle client connections. Neon can close an empty
     // pool and suspend the compute after its configured inactivity window.
     min: nonNegativeInteger('DATABASE_POOL_MIN', 0),
-    max: positiveInteger('DATABASE_POOL_MAX', 10),
+    // Five connections per web replica leave room for migrations, workers and
+    // rolling deploy overlap on a small Neon compute. Raise explicitly only
+    // after measuring queue latency and active connection pressure.
+    max: positiveInteger('DATABASE_POOL_MAX', 5),
     idleTimeoutMillis: positiveInteger('DATABASE_POOL_IDLE_TIMEOUT_MS', 60_000),
     connectionTimeoutMillis: positiveInteger('DATABASE_POOL_CONNECTION_TIMEOUT_MS', 10_000),
   },

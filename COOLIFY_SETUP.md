@@ -11,25 +11,22 @@
 
 ## 2. Настройка переменных окружения
 
-В разделе **Environment Variables** добавьте:
+Production-переменные уже хранятся в зашифрованном `.env.production`, который
+включается в runtime image. В Coolify хранится только ключ расшифровки:
 
 ```env
-PAYLOAD_SECRET=<your_payload_secret>
-DATABASE_URI=<your_database_uri>
-CLOUDFLARE_R2_ACCESS_KEY_ID=<your_cloudflare_access_key_id>
-CLOUDFLARE_R2_SECRET_ACCESS_KEY=<your_cloudflare_secret_access_key>
-CLOUDFLARE_R2_BUCKET_NAME=<your_cloudflare_bucket_name>
-CLOUDFLARE_R2_ENDPOINT=<your_cloudflare_endpoint>
-CLOUDFLARE_R2_PUBLIC_URL=<your_cloudflare_public_url>
-OPENROUTER_TOKEN=<your_openrouter_token>
-NODE_ENV=production
+DOTENV_PRIVATE_KEY_PRODUCTION=<private key from .env.keys>
 ```
 
-Опционально:
+Новые production-секреты добавляются локально и коммитятся только в
+зашифрованном виде:
+
 ```env
-BASEROW_API_KEY=<your_baserow_api_key>
-DATAFORSEO_API_KEY=<your_dataforseo_api_key>
+dotenvx set VARIABLE_NAME 'value' -f .env.production
 ```
+
+Не дублируйте расшифрованные значения в Coolify: runtime environment имеет
+приоритет над `.env.production` и случайная пустая переменная сломает запуск.
 
 ## 3. Настройка портов
 
