@@ -32,7 +32,9 @@ export const ssgOrAuthenticated: Access = ({ req }) => {
 };
 
 export const ssgPublishedOrAuthenticated: Access = ({ req }) => {
-  if (req.user && roleOf(req.user) !== 'automation') return true;
+  // Automation API keys are intentionally read-only on collections using this
+  // access helper; writes remain guarded by `authenticated`/`contentEditor`.
+  if (req.user) return true;
 
   const suppliedKey = req.headers.get('x-navi-ssg-key');
   if (!suppliedKey || suppliedKey !== env.ssgApiKey) return false;
@@ -45,7 +47,7 @@ export const ssgPublishedOrAuthenticated: Access = ({ req }) => {
 };
 
 export const ssgPublishedGlossaryOrAuthenticated: Access = ({ req }) => {
-  if (req.user && roleOf(req.user) !== 'automation') return true;
+  if (req.user) return true;
 
   const suppliedKey = req.headers.get('x-navi-ssg-key');
   if (!suppliedKey || suppliedKey !== env.ssgApiKey) return false;
