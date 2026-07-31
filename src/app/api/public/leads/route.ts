@@ -50,9 +50,14 @@ export async function POST(request: Request) {
   if (String(input.company || '').trim()) return Response.json({ ok: true }, { headers })
 
   const email = String(input.email || '').trim().toLowerCase()
-  const submissionId = String(input.submissionId || '').trim().slice(0, 100)
+  const suppliedSubmissionId = String(input.submissionId || '').trim().slice(0, 100)
+  // Keep old browser tabs and direct integrations working during rollout.
+  // Edge-queued submissions always provide their own stable idempotency key.
+  const submissionId = /^[a-zA-Z0-9_-]{16,100}$/.test(suppliedSubmissionId)
+    ? suppliedSubmissionId
+    : `legacy-${crypto.randomUUID()}`
   const kind = input.kind === 'newsletter' ? 'newsletter' : ['contact', 'service'].includes(String(input.kind)) ? 'contact' : null
-  if (!kind || !/^[a-zA-Z0-9_-]{16,100}$/.test(submissionId) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || input.consent !== true) {
+  if (!kind || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || input.consent !== true) {
     return Response.json({ ok: false, error: 'invalid_fields' }, { status: 422, headers })
   }
 
