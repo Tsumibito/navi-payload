@@ -13,6 +13,7 @@ import * as migration_20260722_130000_subscribers from './20260722_130000_subscr
 import * as migration_20260722_140000_internal_link_rag from './20260722_140000_internal_link_rag';
 import * as migration_20260722_210000_lead_service from './20260722_210000_lead_service';
 import * as migration_20260731_170000_user_api_keys_roles from './20260731_170000_user_api_keys_roles';
+import * as migration_20260731_180000_sync_link_index_job_enum from './20260731_180000_sync_link_index_job_enum';
 
 export const migrations = [
   {
@@ -89,5 +90,10 @@ export const migrations = [
     up: migration_20260731_170000_user_api_keys_roles.up,
     down: migration_20260731_170000_user_api_keys_roles.down,
     name: '20260731_170000_user_api_keys_roles'
+  },
+  {
+    up: migration_20260731_180000_sync_link_index_job_enum.up,
+    down: migration_20260731_180000_sync_link_index_job_enum.down,
+    name: '20260731_180000_sync_link_index_job_enum'
   },
 ];
