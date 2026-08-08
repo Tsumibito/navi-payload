@@ -4,7 +4,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 import { simpleEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
 import { authenticated, ssgPublishedOrAuthenticated } from '../access/authenticated';
-import { createPublicSlugField } from '../fields/publicSlug';
+import { createPublicSlugField, createRouteLockedField, enforcePublicRouteLock } from '../fields/publicSlug';
 
 const POSTS_RELATION = 'posts-new' as unknown as CollectionSlug;
 
@@ -29,8 +29,10 @@ export const Team: CollectionConfig = {
     description: 'Team members with native Payload i18n',
     group: 'Content',
   },
+  hooks: { beforeChange: [enforcePublicRouteLock] },
   fields: [
     createPublicSlugField(),
+    createRouteLockedField(),
     {
       type: 'tabs',
       tabs: [

@@ -4,7 +4,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 import { contentEditorFeatures, simpleEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
 import { adminOnly, contentEditor, ssgOrAuthenticated } from '../access/authenticated';
-import { createPublicSlugField } from '../fields/publicSlug';
+import { createPublicSlugField, createRouteLockedField, enforcePublicRouteLock } from '../fields/publicSlug';
 import { CONTENT_LOCALES } from '../config/contentLocales';
 
 const TEAM_RELATION = 'team-new' as unknown as CollectionSlug;
@@ -31,6 +31,7 @@ export const Posts: CollectionConfig = {
   },
   hooks: {
     beforeChange: [
+      enforcePublicRouteLock,
       ({ data }) => {
         if (!data || !Array.isArray((data as { tags?: unknown }).tags)) {
           return data;
@@ -114,6 +115,7 @@ export const Posts: CollectionConfig = {
   },
   fields: [
     createPublicSlugField(),
+    createRouteLockedField(),
     {
       type: 'select',
       name: 'publicationStatus',

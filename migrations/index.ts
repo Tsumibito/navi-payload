@@ -15,6 +15,7 @@ import * as migration_20260722_210000_lead_service from './20260722_210000_lead_
 import * as migration_20260731_170000_user_api_keys_roles from './20260731_170000_user_api_keys_roles';
 import * as migration_20260731_180000_sync_link_index_job_enum from './20260731_180000_sync_link_index_job_enum';
 import * as migration_20260731_190000_lead_submission_ids from './20260731_190000_lead_submission_ids';
+import * as migration_20260808_140000_route_locks from './20260808_140000_route_locks';
 
 export const migrations = [
   {
@@ -101,5 +102,10 @@ export const migrations = [
     up: migration_20260731_190000_lead_submission_ids.up,
     down: migration_20260731_190000_lead_submission_ids.down,
     name: '20260731_190000_lead_submission_ids'
+  },
+  {
+    up: migration_20260808_140000_route_locks.up,
+    down: migration_20260808_140000_route_locks.down,
+    name: '20260808_140000_route_locks'
   },
 ];

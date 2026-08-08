@@ -274,6 +274,10 @@ export interface Page {
    * Frozen production URL slug. Non-localized and independent from translated editorial slugs.
    */
   publicSlug?: string | null;
+  /**
+   * Keep enabled after publication. Disable and save before an approved URL migration with redirects.
+   */
+  routeLocked: boolean;
   h1?: string | null;
   content?: {
     root: {
@@ -349,6 +353,10 @@ export interface PostsNew {
    * Frozen production URL slug. Non-localized and independent from translated editorial slugs.
    */
   publicSlug?: string | null;
+  /**
+   * Keep enabled after publication. Disable and save before an approved URL migration with redirects.
+   */
+  routeLocked: boolean;
   /**
    * Global for the whole article (RU / UK / EN). Publishing is separate from saving.
    */
@@ -551,6 +559,10 @@ export interface TeamNew {
    */
   publicSlug?: string | null;
   /**
+   * Keep enabled after publication. Disable and save before an approved URL migration with redirects.
+   */
+  routeLocked: boolean;
+  /**
    * Team member photo
    */
   photo?: (number | null) | Media;
@@ -718,6 +730,10 @@ export interface TagsNew {
    */
   publicSlug?: string | null;
   /**
+   * Keep enabled after publication. Disable and save before an approved URL migration with redirects.
+   */
+  routeLocked: boolean;
+  /**
    * Tag display name (localized)
    */
   name: string;
@@ -850,6 +866,10 @@ export interface Certificate {
    * Frozen production URL slug. Non-localized and independent from translated editorial slugs.
    */
   publicSlug?: string | null;
+  /**
+   * Keep enabled after publication. Disable and save before an approved URL migration with redirects.
+   */
+  routeLocked: boolean;
   /**
    * Certificate name (localized)
    */
@@ -1124,6 +1144,7 @@ export interface GlossaryTerm {
  */
 export interface Lead {
   id: number;
+  submissionId: string;
   email: string;
   kind: 'newsletter' | 'contact';
   status: 'new' | 'contacted' | 'subscribed' | 'unsubscribed';
@@ -1149,6 +1170,7 @@ export interface Lead {
  */
 export interface Subscriber {
   id: number;
+  submissionId?: string | null;
   email: string;
   status: 'subscribed' | 'unsubscribed';
   firstName?: string | null;
@@ -1491,6 +1513,7 @@ export interface PagesSelect<T extends boolean = true> {
   pageKey?: T;
   pageType?: T;
   publicSlug?: T;
+  routeLocked?: T;
   h1?: T;
   content?: T;
   seo?:
@@ -1517,6 +1540,7 @@ export interface PagesSelect<T extends boolean = true> {
  */
 export interface PostsNewSelect<T extends boolean = true> {
   publicSlug?: T;
+  routeLocked?: T;
   publicationStatus?: T;
   localizationWorkflow?:
     | T
@@ -1585,6 +1609,7 @@ export interface PostsNewSelect<T extends boolean = true> {
  */
 export interface TagsNewSelect<T extends boolean = true> {
   publicSlug?: T;
+  routeLocked?: T;
   name?: T;
   slug?: T;
   image?: T;
@@ -1629,6 +1654,7 @@ export interface TagsNewSelect<T extends boolean = true> {
  */
 export interface TeamNewSelect<T extends boolean = true> {
   publicSlug?: T;
+  routeLocked?: T;
   photo?: T;
   name?: T;
   slug?: T;
@@ -1675,6 +1701,7 @@ export interface TeamNewSelect<T extends boolean = true> {
  */
 export interface CertificatesSelect<T extends boolean = true> {
   publicSlug?: T;
+  routeLocked?: T;
   name?: T;
   slug?: T;
   frontImage?: T;
@@ -1787,6 +1814,7 @@ export interface GlossaryTermsSelect<T extends boolean = true> {
  * via the `definition` "leads_select".
  */
 export interface LeadsSelect<T extends boolean = true> {
+  submissionId?: T;
   email?: T;
   kind?: T;
   status?: T;
@@ -1809,6 +1837,7 @@ export interface LeadsSelect<T extends boolean = true> {
  * via the `definition` "subscribers_select".
  */
 export interface SubscribersSelect<T extends boolean = true> {
+  submissionId?: T;
   email?: T;
   status?: T;
   firstName?: T;

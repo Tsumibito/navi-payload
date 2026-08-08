@@ -4,7 +4,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 import { contentEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
 import { authenticated, ssgOrAuthenticated } from '../access/authenticated';
-import { createPublicSlugField } from '../fields/publicSlug';
+import { createPublicSlugField, createRouteLockedField, enforcePublicRouteLock } from '../fields/publicSlug';
 
 export const Certificates: CollectionConfig = {
   slug: 'certificates',
@@ -24,8 +24,10 @@ export const Certificates: CollectionConfig = {
     update: authenticated,
     delete: authenticated,
   },
+  hooks: { beforeChange: [enforcePublicRouteLock] },
   fields: [
     createPublicSlugField(),
+    createRouteLockedField(),
     {
       type: 'tabs',
       tabs: [

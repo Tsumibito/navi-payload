@@ -3,7 +3,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical'
 
 import { authenticated } from '../access/authenticated'
 import { createSeoField } from '../fields/seo'
-import { createPublicSlugField } from '../fields/publicSlug'
+import { createPublicSlugField, createRouteLockedField, enforcePublicRouteLock } from '../fields/publicSlug'
 import { contentEditorFeatures } from '../utils/lexicalConfig'
 
 export const Pages: CollectionConfig = {
@@ -24,6 +24,7 @@ export const Pages: CollectionConfig = {
     update: authenticated,
     delete: authenticated,
   },
+  hooks: { beforeChange: [enforcePublicRouteLock] },
   versions: {
     drafts: true,
   },
@@ -56,6 +57,7 @@ export const Pages: CollectionConfig = {
       },
     },
     createPublicSlugField(),
+    createRouteLockedField(),
     {
       type: 'tabs',
       tabs: [

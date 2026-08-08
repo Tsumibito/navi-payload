@@ -4,7 +4,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 import { contentEditorFeatures, simpleEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
 import { authenticated, ssgOrAuthenticated } from '../access/authenticated';
-import { createPublicSlugField } from '../fields/publicSlug';
+import { createPublicSlugField, createRouteLockedField, enforcePublicRouteLock } from '../fields/publicSlug';
 
 const POSTS_RELATION = 'posts-new' as unknown as CollectionSlug;
 
@@ -59,6 +59,7 @@ export const Tags: CollectionConfig = {
   },
   hooks: {
     beforeChange: [
+      enforcePublicRouteLock,
       ({ data }) => {
         if (!data) {
           return data;
@@ -84,6 +85,7 @@ export const Tags: CollectionConfig = {
   },
   fields: [
     createPublicSlugField(),
+    createRouteLockedField(),
     {
       type: 'tabs',
       tabs: [
