@@ -16,6 +16,7 @@ import * as migration_20260731_170000_user_api_keys_roles from './20260731_17000
 import * as migration_20260731_180000_sync_link_index_job_enum from './20260731_180000_sync_link_index_job_enum';
 import * as migration_20260731_190000_lead_submission_ids from './20260731_190000_lead_submission_ids';
 import * as migration_20260808_140000_route_locks from './20260808_140000_route_locks';
+import * as migration_20260808_150000_public_slug_backfill from './20260808_150000_public_slug_backfill';
 
 export const migrations = [
   {
@@ -107,5 +108,10 @@ export const migrations = [
     up: migration_20260808_140000_route_locks.up,
     down: migration_20260808_140000_route_locks.down,
     name: '20260808_140000_route_locks'
+  },
+  {
+    up: migration_20260808_150000_public_slug_backfill.up,
+    down: migration_20260808_150000_public_slug_backfill.down,
+    name: '20260808_150000_public_slug_backfill'
   },
 ];
