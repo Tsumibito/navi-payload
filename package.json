@@ -15,6 +15,8 @@
     "start:encrypted-production": "dotenvx run -f .env.production -- next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test": "node scripts/verify-migration-contract.mjs",
+    "verify:migrations": "node scripts/verify-migration-contract.mjs",
     "gitleaks:scan": "gitleaks git --redact",
     "gitleaks:staged": "gitleaks git --staged --redact",
     "payload:types": "dotenvx run -f .env.development -- sh -c 'PAYLOAD_CONFIG_PATH=src/payload.config.ts payload generate:types'",

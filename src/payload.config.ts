@@ -23,6 +23,7 @@ import { syncLinkIndexTask } from './jobs/syncLinkIndex'
 import { GlossaryTerms } from './collections/GlossaryTerms'
 import { Leads } from './collections/Leads'
 import { Subscribers } from './collections/Subscribers'
+import { migrations } from '../migrations'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -55,6 +56,10 @@ export default buildConfig({
   },
   db: postgresAdapter({
     schemaName: env.databaseSchema,
+    // Production schema changes are explicit and ordered. Payload applies
+    // pending registered migrations during initialization and aborts startup
+    // if any migration fails. `push` remains disabled in production.
+    prodMigrations: migrations,
     pool: {
       connectionString: env.databaseUri,
       application_name: 'navi-payload',
