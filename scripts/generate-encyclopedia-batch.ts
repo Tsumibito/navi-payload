@@ -5,10 +5,11 @@ import { extractTextFromLexical } from '../src/utils/lexicalLinkAnalysis'
 
 const token = process.env.OPENROUTER_TOKEN?.trim()
 if (!token) throw new Error('OPENROUTER_TOKEN is required')
-const model = process.env.OPENROUTER_GLOSSARY_MODEL?.trim() || 'google/gemini-3.6-flash'
+const model = process.env.OPENROUTER_GLOSSARY_MODEL?.trim() || 'deepseek/deepseek-v4-pro'
 const limit = Number(process.argv.find((value) => value.startsWith('--limit='))?.slice(8) || 60)
 const concurrency = Number(process.argv.find((value) => value.startsWith('--concurrency='))?.slice(14) || 3)
 const only = new Set((process.argv.find((value) => value.startsWith('--only='))?.slice(7) || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean))
+const publish = process.argv.includes('--publish')
 const payload = await getPayload({ config })
 
 const candidates = [
@@ -18,6 +19,9 @@ const candidates = [
   ['running downwind','sailing-theory'],['windward','sailing-theory'],['leeward','sailing-theory'],['knot (speed)','navigation'],['nautical chart','navigation'],['magnetic compass','navigation'],['bearing','navigation'],['heading','navigation'],['course','navigation'],['waypoint','electronic-navigation'],
   ['latitude','navigation'],['longitude','navigation'],['depth sounder','electronic-navigation'],['GPS','electronic-navigation'],['AIS','electronic-navigation'],['marine radar','electronic-navigation'],['VHF marine radio','vhf-radio-communication'],['MAYDAY','vhf-radio-communication'],['PAN-PAN','vhf-radio-communication'],['EPIRB','life-saving-equipment'],
   ['life raft','life-saving-equipment'],['life jacket','life-saving-equipment'],['man overboard','safety-at-sea'],['COLREGs','collision-regulations'],['draught','yacht-design'],['displacement','yacht-design'],['catamaran','catamarans'],['monohull','sailing-yachts'],['heave-to','safety-at-sea'],['sea anchor','safety-at-sea'],
+  ['cockpit','yacht-design'],['deck','yacht-design'],['cabin','yacht-design'],['companionway','yacht-design'],['transom','yacht-design'],['freeboard','yacht-design'],['beam (width)','yacht-design'],['waterline','yacht-design'],['ballast','yacht-design'],['backstay','yacht-equipment'],
+  ['anchor windlass','anchoring'],['anchor chain','anchoring'],['anchor scope','anchoring'],['telltale','sail-handling-trim'],['luff','sail-handling-trim'],['leech','sail-handling-trim'],['sail foot','sail-handling-trim'],['boom vang','sail-handling-trim'],['outhaul','sail-handling-trim'],['traveller','sail-handling-trim'],
+  ['buoyage','navigation'],['cardinal mark','navigation'],['lateral mark','navigation'],['chart datum','navigation'],['tidal stream','navigation'],
 ] as const
 
 type Locale = 'ru' | 'uk' | 'en'
@@ -50,7 +54,7 @@ async function wikipediaEvidence(query: string) {
   const url = new URL('https://en.wikipedia.org/w/api.php')
   url.searchParams.set('action', 'query'); url.searchParams.set('generator', 'search'); url.searchParams.set('gsrsearch', `${query} sailing`); url.searchParams.set('gsrlimit', '1')
   url.searchParams.set('prop', 'extracts|info'); url.searchParams.set('exintro', '1'); url.searchParams.set('explaintext', '1'); url.searchParams.set('inprop', 'url'); url.searchParams.set('format', 'json'); url.searchParams.set('origin', '*')
-  const response = await fetch(url, { headers: { 'User-Agent': 'Navi.training encyclopedia/1.0 (https://navi.training)' } })
+  const response = await fetch(url, { headers: { 'User-Agent': 'Navi.training encyclopedia/1.0 (https://navi.training)' }, signal: AbortSignal.timeout(30_000) })
   if (!response.ok) return null
   const body = await response.json() as any
   const page = Object.values(body.query?.pages || {})[0] as any
@@ -82,8 +86,9 @@ async function generateOne([canonicalKey, categorySlug]: typeof candidates[numbe
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://navi.training', 'X-Title': 'Navi.training Yachting Encyclopedia' },
+    signal: AbortSignal.timeout(180_000),
     body: JSON.stringify({ model, temperature: 0.15, response_format: { type: 'json_object' }, messages: [
-      { role: 'system', content: `You edit “Navi.training Yachting Encyclopedia”. Write independent Russian, Ukrainian and English entries for one precise sailing concept. Each encyclopediaText must be 150–300 words, factually conservative and useful in practice. Define all measurements exactly and distinguish homonyms. Use Navi.training excerpts as house terminology and the supplied Wikipedia introduction only as an attributed factual reference. In EACH article insert 1–3 natural inline Markdown links chosen only from allowedInternalUrls. Prefer useful blog explanations; a topic tag is appropriate when it helps further exploration. Distribute links contextually, never collect them at the end. Return JSON {"domain":"...","translations":{"ru":{"term":"","slug":"","definition":"","encyclopediaText":"","usageNotes":"","seoTitle":"","seoDescription":"","imageAlt":""},"uk":{...},"en":{...}}}. Slugs are URL-safe Latin transliterations. SEO title <=60 chars; description 120–160 chars. Do not add external links or citations to prose.` },
+      { role: 'system', content: `You edit “Navi.training Yachting Encyclopedia”. Write independent Russian, Ukrainian and English entries for one precise sailing concept. Every locale object and every requested field is mandatory. Each encyclopediaText must be 170–240 words, factually conservative and useful in practice. Define all measurements exactly and distinguish homonyms. Use Navi.training excerpts as house terminology and the supplied Wikipedia introduction only as an attributed factual reference. In EACH article insert exactly 2 natural inline Markdown links chosen only from that locale's allowedInternalUrls. Prefer useful blog explanations; a topic tag is appropriate when it helps further exploration. Distribute links contextually, never collect them at the end. Return JSON {"domain":"...","translations":{"ru":{"term":"","slug":"","definition":"","encyclopediaText":"","usageNotes":"","seoTitle":"","seoDescription":"","imageAlt":""},"uk":{...},"en":{...}}}. Slugs are URL-safe Latin transliterations. Each SEO title must be 35–60 characters; each SEO description must be 125–155 characters. Count these constraints before responding. Do not add external links or citations to prose.` },
       { role: 'user', content: JSON.stringify({ canonicalKey, category: categorySlug, naviEvidence: evidence, allowedInternalUrls: Object.fromEntries((['ru','uk','en'] as Locale[]).map((locale) => [locale, [...allowedUrls[locale]]])), wikipedia: wiki }) },
     ] }),
   })
@@ -105,10 +110,10 @@ async function generateOne([canonicalKey, categorySlug]: typeof candidates[numbe
     }
     validateTranslation(locale, item, allowedUrls[locale])
     const old = oldTranslations.find((translation: any) => translation.locale === locale)
-    return { ...item, locale, aliases: old?.aliases || [], forbiddenVariants: old?.forbiddenVariants || [], status: 'approved', provenance: 'agent', confidence: 0.8 }
+    return { ...item, locale, aliases: old?.aliases || [], forbiddenVariants: old?.forbiddenVariants || [], status: publish ? 'approved' : 'proposed', provenance: 'agent', confidence: 0.8 }
   })
   const data: any = {
-    canonicalKey: canonicalKey.toLowerCase(), domain: glossaryDomains.has(generated.domain) ? generated.domain : categorySlug === 'meteorology' ? 'meteorology' : categorySlug.includes('navigation') ? 'navigation' : categorySlug === 'vhf-radio-communication' ? 'radio' : ['safety-at-sea','life-saving-equipment','collision-regulations'].includes(categorySlug) ? 'safety' : categorySlug === 'yacht-design' ? 'boatbuilding' : 'sailing', status: 'approved', release: 'published', categories: categoryId ? [categoryId] : [], translations,
+    canonicalKey: canonicalKey.toLowerCase(), domain: glossaryDomains.has(generated.domain) ? generated.domain : categorySlug === 'meteorology' ? 'meteorology' : categorySlug.includes('navigation') ? 'navigation' : categorySlug === 'vhf-radio-communication' ? 'radio' : ['safety-at-sea','life-saving-equipment','collision-regulations'].includes(categorySlug) ? 'safety' : categorySlug === 'yacht-design' ? 'boatbuilding' : 'sailing', status: publish ? 'approved' : 'proposed', release: publish ? 'published' : 'mvp', categories: categoryId ? [categoryId] : [], translations,
     sources: [
       ...Object.values(evidence).flat().map((article) => ({ name: `Navi.training: ${article.title}`, url: `https://navi.training${article.url}`, sourceRecordId: String(article.id), reusePolicy: 'ingest', retrievedAt: new Date().toISOString() })),
       ...(wiki ? [{ name: `Wikipedia: ${wiki.title}`, url: wiki.url, reusePolicy: 'attribution', license: 'CC BY-SA 4.0 / GFDL', retrievedAt: new Date().toISOString() }] : []),
@@ -117,10 +122,15 @@ async function generateOne([canonicalKey, categorySlug]: typeof candidates[numbe
   }
   if (existing.docs[0]) await payload.update({ collection: 'glossary-terms', id: existing.docs[0].id, data })
   else await payload.create({ collection: 'glossary-terms', data })
-  return { key: canonicalKey, state: 'generated' }
+  return { key: canonicalKey, state: publish ? 'published' : 'drafted' }
 }
 
 const selected = (only.size ? candidates.filter(([key]) => only.has(key.toLowerCase())) : candidates).slice(0, Math.min(limit, candidates.length))
+if (only.size && selected.length !== only.size) {
+  const selectedKeys = new Set(selected.map(([key]) => key.toLowerCase()))
+  throw new Error(`Unknown --only candidates: ${[...only].filter((key) => !selectedKeys.has(key)).join(', ')}`)
+}
+console.log(`Generating ${selected.length} encyclopedia concepts with ${model} (${publish ? 'publish' : 'draft'} mode)`)
 const failures: Array<{ key: string; error: string }> = []
 let completed = 0
 for (let offset = 0; offset < selected.length; offset += concurrency) {
