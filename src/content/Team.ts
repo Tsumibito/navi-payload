@@ -3,7 +3,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 
 import { simpleEditorFeatures } from '../utils/lexicalConfig';
 import { createSeoField } from '../fields/seo';
-import { authenticated, ssgPublishedOrAuthenticated } from '../access/authenticated';
+import { authenticated, ssgOrAuthenticated } from '../access/authenticated';
 import { createPublicSlugField, createRouteLockedField, enforcePublicRouteLock } from '../fields/publicSlug';
 
 const POSTS_RELATION = 'posts-new' as unknown as CollectionSlug;
@@ -14,11 +14,12 @@ export const Team: CollectionConfig = {
     singular: 'Team Member',
     plural: 'Team',
   },
-  versions: {
-    drafts: true,
-  },
+  // Production has never had the Payload version tables for this collection.
+  // Keep the collection on its actual persisted contract until a dedicated,
+  // data-preserving drafts migration creates and backfills `_team_new_v`.
+  versions: false,
   access: {
-    read: ssgPublishedOrAuthenticated,
+    read: ssgOrAuthenticated,
     create: authenticated,
     update: authenticated,
     delete: authenticated,
