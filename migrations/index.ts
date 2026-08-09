@@ -17,6 +17,7 @@ import * as migration_20260731_180000_sync_link_index_job_enum from './20260731_
 import * as migration_20260731_190000_lead_submission_ids from './20260731_190000_lead_submission_ids';
 import * as migration_20260808_140000_route_locks from './20260808_140000_route_locks';
 import * as migration_20260808_150000_public_slug_backfill from './20260808_150000_public_slug_backfill';
+import * as migration_20260809_170000_charter_geography_editorial from './20260809_170000_charter_geography_editorial';
 
 export const migrations = [
   {
@@ -113,5 +114,10 @@ export const migrations = [
     up: migration_20260808_150000_public_slug_backfill.up,
     down: migration_20260808_150000_public_slug_backfill.down,
     name: '20260808_150000_public_slug_backfill'
+  },
+  {
+    up: migration_20260809_170000_charter_geography_editorial.up,
+    down: migration_20260809_170000_charter_geography_editorial.down,
+    name: '20260809_170000_charter_geography_editorial'
   },
 ];

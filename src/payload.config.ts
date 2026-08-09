@@ -23,6 +23,8 @@ import { syncLinkIndexTask } from './jobs/syncLinkIndex'
 import { GlossaryTerms } from './collections/GlossaryTerms'
 import { Leads } from './collections/Leads'
 import { Subscribers } from './collections/Subscribers'
+import { GeographyPages } from './content/GeographyPages'
+import { SailingRoutes } from './content/SailingRoutes'
 import { migrations } from '../migrations'
 
 const filename = fileURLToPath(import.meta.url)
@@ -40,7 +42,7 @@ export default buildConfig({
   cors: [env.serverUrl],
   csrf: [env.serverUrl],
   defaultDepth: 0,
-  collections: [Users, Media, Redirects, Pages, Posts, Tags, Team, Certificates, Trainings, GlossaryTerms, Leads, Subscribers],
+  collections: [Users, Media, Redirects, Pages, Posts, Tags, Team, Certificates, Trainings, GlossaryTerms, GeographyPages, SailingRoutes, Leads, Subscribers],
   globals: [SiteGlobals],
   editor: lexicalEditor(),
   secret: env.payloadSecret,

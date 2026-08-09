@@ -77,6 +77,8 @@ export interface Config {
     certificates: Certificate;
     trainings: Training;
     'glossary-terms': GlossaryTerm;
+    'geography-pages': GeographyPage;
+    'sailing-routes': SailingRoute;
     leads: Lead;
     subscribers: Subscriber;
     'payload-kv': PayloadKv;
@@ -97,6 +99,8 @@ export interface Config {
     certificates: CertificatesSelect<false> | CertificatesSelect<true>;
     trainings: TrainingsSelect<false> | TrainingsSelect<true>;
     'glossary-terms': GlossaryTermsSelect<false> | GlossaryTermsSelect<true>;
+    'geography-pages': GeographyPagesSelect<false> | GeographyPagesSelect<true>;
+    'sailing-routes': SailingRoutesSelect<false> | SailingRoutesSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
     subscribers: SubscribersSelect<false> | SubscribersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -715,7 +719,6 @@ export interface TeamNew {
     | null;
   updatedAt: string;
   createdAt: string;
-  _status?: ('draft' | 'published') | null;
 }
 /**
  * Localized tags managed via native Payload i18n
@@ -1104,6 +1107,18 @@ export interface GlossaryTerm {
     definition?: string | null;
     encyclopediaText?: string | null;
     usageNotes?: string | null;
+    /**
+     * 2–4 reviewed question/answer objects. Answers must be derived from approved glossary facts.
+     */
+    faqs?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
     seoTitle?: string | null;
     seoDescription?: string | null;
     imageAlt?: string | null;
@@ -1135,6 +1150,152 @@ export interface GlossaryTerm {
     | null;
   evidencePosts?: (number | PostsNew)[] | null;
   editorNotes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Editorial layer for verified importer-owned geography entities.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "geography-pages".
+ */
+export interface GeographyPage {
+  id: number;
+  entityId: string;
+  entityFamily: 'country' | 'sailing_area' | 'region' | 'island' | 'locality' | 'marina';
+  /**
+   * Frozen production URL slug. Non-localized and independent from translated editorial slugs.
+   */
+  publicSlug?: string | null;
+  /**
+   * Keep enabled after publication. Disable and save before an approved URL migration with redirects.
+   */
+  routeLocked: boolean;
+  status: 'inventory' | 'draft' | 'review' | 'published' | 'retired';
+  localizedContent:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  localizedSeo?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  heroMedia?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  landingCard?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  showOnCharterLanding?: boolean | null;
+  landingOrder?: number | null;
+  systemProjection?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  projectionHash: string;
+  editorialApproval?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sailing-routes".
+ */
+export interface SailingRoute {
+  id: number;
+  routeId: string;
+  /**
+   * Frozen production URL slug. Non-localized and independent from translated editorial slugs.
+   */
+  publicSlug?: string | null;
+  /**
+   * Keep enabled after publication. Disable and save before an approved URL migration with redirects.
+   */
+  routeLocked: boolean;
+  status: 'draft' | 'review' | 'published' | 'retired';
+  region: number | GeographyPage;
+  departureMarina: number | GeographyPage;
+  localizedContent:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  localizedSeo?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  heroMedia?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  systemProjection?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  projectionHash: string;
+  editorialApproval?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1343,6 +1504,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'glossary-terms';
         value: number | GlossaryTerm;
+      } | null)
+    | ({
+        relationTo: 'geography-pages';
+        value: number | GeographyPage;
+      } | null)
+    | ({
+        relationTo: 'sailing-routes';
+        value: number | SailingRoute;
       } | null)
     | ({
         relationTo: 'leads';
@@ -1693,7 +1862,6 @@ export interface TeamNewSelect<T extends boolean = true> {
       };
   updatedAt?: T;
   createdAt?: T;
-  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1778,6 +1946,7 @@ export interface GlossaryTermsSelect<T extends boolean = true> {
         definition?: T;
         encyclopediaText?: T;
         usageNotes?: T;
+        faqs?: T;
         seoTitle?: T;
         seoDescription?: T;
         imageAlt?: T;
@@ -1806,6 +1975,48 @@ export interface GlossaryTermsSelect<T extends boolean = true> {
       };
   evidencePosts?: T;
   editorNotes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "geography-pages_select".
+ */
+export interface GeographyPagesSelect<T extends boolean = true> {
+  entityId?: T;
+  entityFamily?: T;
+  publicSlug?: T;
+  routeLocked?: T;
+  status?: T;
+  localizedContent?: T;
+  localizedSeo?: T;
+  heroMedia?: T;
+  landingCard?: T;
+  showOnCharterLanding?: T;
+  landingOrder?: T;
+  systemProjection?: T;
+  projectionHash?: T;
+  editorialApproval?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sailing-routes_select".
+ */
+export interface SailingRoutesSelect<T extends boolean = true> {
+  routeId?: T;
+  publicSlug?: T;
+  routeLocked?: T;
+  status?: T;
+  region?: T;
+  departureMarina?: T;
+  localizedContent?: T;
+  localizedSeo?: T;
+  heroMedia?: T;
+  systemProjection?: T;
+  projectionHash?: T;
+  editorialApproval?: T;
   updatedAt?: T;
   createdAt?: T;
 }

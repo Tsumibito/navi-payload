@@ -64,6 +64,7 @@ export const GlossaryTerms: CollectionConfig = {
         { type: 'textarea', name: 'definition', label: 'Short definition' },
         { type: 'textarea', name: 'encyclopediaText', label: 'Short encyclopedia article' },
         { type: 'textarea', name: 'usageNotes', label: 'Usage and context' },
+        { type: 'json', name: 'faqs', label: 'Localized FAQ', admin: { description: '2–4 reviewed question/answer objects. Answers must be derived from approved glossary facts.' } },
         { type: 'text', name: 'seoTitle', label: 'SEO title' },
         { type: 'textarea', name: 'seoDescription', label: 'SEO description' },
         { type: 'textarea', name: 'imageAlt', label: 'Localized image alt text' },
