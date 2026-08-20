@@ -16,6 +16,7 @@ const DENIED_SEGMENTS = new Set([
 
 type PatchOperation = { field: string; value: unknown }
 type ExecutorRequest = {
+  mode?: 'preview' | 'draft'
   collection?: string
   documentId?: string | number
   locale?: string
@@ -71,7 +72,8 @@ export async function POST(request: Request) {
   if (!body.documentId || !body.locale || !ALLOWED_LOCALES.has(body.locale)) {
     return NextResponse.json({ error: 'Document and locale are required' }, { status: 422 })
   }
-  if (!body.expectedHash?.match(/^[a-f0-9]{64}$/) || !body.idempotencyKey) {
+  const mode = body.mode || 'draft'
+  if (mode !== 'preview' && (!body.expectedHash?.match(/^[a-f0-9]{64}$/) || !body.idempotencyKey)) {
     return NextResponse.json({ error: 'Version lock and idempotency key are required' }, { status: 422 })
   }
   if (!Array.isArray(body.operations) || body.operations.length < 1 || body.operations.length > 5) {
@@ -89,18 +91,26 @@ export async function POST(request: Request) {
   const collection = body.collection as 'posts-new' | 'pages'
   const current = await payload.findByID({
     collection, id: body.documentId, locale: body.locale as 'en' | 'ru' | 'uk',
-    fallbackLocale: false, depth: 0,
+    fallbackLocale: false, depth: 0, draft: true,
   }) as unknown as Record<string, unknown>
   const before = Object.fromEntries(body.operations.map(({ field }) => [field, readField(current, field)]))
   const desired = Object.fromEntries(body.operations.map(({ field, value }) => [field, value]))
+  const currentHash = digest(before)
+  if (mode === 'preview') {
+    return NextResponse.json({
+      applied: false, idempotent: stable(before) === stable(desired), preview: true,
+      before, after: desired, priorHash: currentHash,
+      draftCreated: false, publishedUnchanged: true,
+    })
+  }
   if (stable(before) === stable(desired)) {
     const contentHash = digest(before)
     return NextResponse.json({
       applied: false, idempotent: true, idempotencyKey: body.idempotencyKey,
       before, after: desired, priorHash: contentHash, appliedHash: contentHash,
+      draftCreated: false, publishedUnchanged: true,
     })
   }
-  const currentHash = digest(before)
   if (currentHash !== body.expectedHash) {
     return NextResponse.json({ error: 'Content changed after approval', currentHash }, { status: 409 })
   }
@@ -108,7 +118,7 @@ export async function POST(request: Request) {
   for (const operation of body.operations) applyField(data, operation.field, operation.value)
   await payload.update({
     collection, id: body.documentId, locale: body.locale as 'en' | 'ru' | 'uk',
-    fallbackLocale: false, data, context: { skipLocalizationWorkflow: true },
+    fallbackLocale: false, data, draft: true, context: { skipLocalizationWorkflow: true },
   })
   return NextResponse.json({
     applied: true,
@@ -118,5 +128,7 @@ export async function POST(request: Request) {
     after: desired,
     priorHash: currentHash,
     appliedHash: digest(desired),
+    draftCreated: true,
+    publishedUnchanged: true,
   })
 }
