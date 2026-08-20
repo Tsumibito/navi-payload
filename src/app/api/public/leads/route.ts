@@ -28,6 +28,37 @@ function requestIp(request: Request) {
   ).trim().slice(0, 80)
 }
 
+const contextKeys = new Set([
+  'yacht_id', 'yacht_name', 'region', 'base', 'offer_start', 'offer_end', 'party_context',
+  'final_price', 'currency', 'booking_action', 'adults', 'children', 'charter_format',
+  'skipper_qualification',
+])
+
+function requestKind(service: string): 'general' | 'training' | 'charter' | 'delivery' | 'expertise' {
+  if (service.startsWith('yacht-charter')) return 'charter'
+  if (service === 'yacht-delivery') return 'delivery'
+  if (service === 'yacht-expertise') return 'expertise'
+  if (/training|course|school|inshore|offshore/.test(service)) return 'training'
+  return 'general'
+}
+
+function sourceChannel(utm: string): 'organic' | 'direct' | 'referral' | 'paid' | 'unknown' {
+  const params = new URLSearchParams(utm)
+  const medium = String(params.get('utm_medium') || '').toLowerCase()
+  const source = String(params.get('utm_source') || '').toLowerCase()
+  if (['cpc', 'ppc', 'paid', 'paid_search'].includes(medium)) return 'paid'
+  if (medium === 'organic' || ['google', 'bing', 'duckduckgo', 'yandex'].includes(source)) return 'organic'
+  if (source || medium === 'referral') return 'referral'
+  return utm ? 'unknown' : 'direct'
+}
+
+function sanitizedContext(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .filter(([key]) => contextKeys.has(key))
+    .map(([key, child]) => [key, String(child || '').trim().slice(0, 500)]))
+}
+
 export async function OPTIONS(request: Request) {
   return new Response(null, { status: 204, headers: cors(request.headers.get('origin')) })
 }
@@ -62,6 +93,12 @@ export async function POST(request: Request) {
   }
 
   const clean = (value: unknown, max: number) => String(value || '').trim().slice(0, max)
+  const service = clean(input.service, 160)
+  const utm = clean(input.utm, 1000)
+  const context = sanitizedContext(input.context)
+  const adults = Math.max(0, Math.min(24, Number.parseInt(context.adults || '0', 10) || 0))
+  const children = Math.max(0, Math.min(24, Number.parseInt(context.children || '0', 10) || 0))
+  const partySize = adults + children || null
   const ip = requestIp(request)
   const payload = await getPayload({ config })
   // The generated Payload types are updated during the deployment build. Keep
@@ -141,10 +178,20 @@ export async function POST(request: Request) {
       lastName: clean(input.lastName, 120),
       phone: clean(input.phone, 80),
       message: clean(input.message, 3000),
-      service: clean(input.service, 160),
+      service,
+      requestKind: requestKind(service),
+      lifecycleStage: 'inquiry',
+      qualificationStatus: 'unknown',
+      sourceChannel: sourceChannel(utm),
+      requestedStartDate: context.offer_start || null,
+      requestedEndDate: context.offer_end || null,
+      requestedLocation: clean(context.region || context.base, 240),
+      partySize,
+      yachtReference: clean(context.yacht_id, 240),
+      requestContext: context,
       locale: clean(input.locale, 8),
       sourceUrl: clean(input.sourceUrl, 500),
-      utm: clean(input.utm, 1000),
+      utm,
       ip,
       userAgent: clean(request.headers.get('user-agent'), 500),
       consentAt: new Date().toISOString(),
